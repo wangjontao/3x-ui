@@ -13,7 +13,6 @@ on:
   push:
     branches:
       - main
-      - juliang-ui-v1
     paths:
       - "**.go"
       - "go.mod"
