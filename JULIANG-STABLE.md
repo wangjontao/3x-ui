@@ -42,3 +42,10 @@ Release tag: `juliang-v2.9.3-r2.3`.
 Release tag: `juliang-v2.9.3-r2.4`.
 
 When adding a client, manually-entered duplicate emails are automatically suffixed (`test1` → `test1-2`, `test1-3`, ...). The email refresh button also generates a globally unique value.
+
+
+### R2.5
+
+Release tag: `juliang-v2.9.3-r2.5`.
+
+Per-client landing routes are always injected at the very beginning of `routing.rules`, so a selected SK5/outbound takes priority over generic/direct rules already present in the Xray template.
