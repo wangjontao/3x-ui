@@ -197,7 +197,7 @@ export default function InboundList({
   const generalActionsMenu: MenuProps = {
     items: [
       { key: 'import', icon: <ImportOutlined />, label: t('pages.inbounds.importInbound') },
-      { key: 'export', icon: <ExportOutlined />, label: t('pages.inbounds.export') },
+      { key: 'export', icon: <ExportOutlined />, label: t('pages.inbounds.exportClientLinks') },
       {
         key: 'exportClients',
         icon: <ExportOutlined />,

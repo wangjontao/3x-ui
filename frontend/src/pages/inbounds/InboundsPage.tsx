@@ -324,6 +324,10 @@ export default function InboundsPage() {
       clients?: ClientMatchTarget[];
     };
     const clients = settings.clients || [];
+    if (client.email) {
+      const byEmail = clients.findIndex((c) => c?.email === client.email);
+      if (byEmail >= 0) return byEmail;
+    }
     const idx = clients.findIndex((c) => {
       if (!c) return false;
       switch (dbInbound.protocol) {
