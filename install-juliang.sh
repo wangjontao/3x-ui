@@ -1055,7 +1055,7 @@ install_x-ui() {
     rm -rf "${juliang_backup}"
     rm -f "${juliang_cli_backup}" "${juliang_service_backup}"
 
-    echo -e "${green}x-ui ${tag_version}${plain} 安装完成，当前正在运行..."
+    echo -e "${green}JuLiang-UI ${tag_version}${plain} 安装完成，当前正在运行..."
     echo -e ""
     echo -e "┌───────────────────────────────────────────────────────────────┐
 │  ${blue}x-ui 控制菜单用法（子命令）：${plain}                                │
@@ -1070,7 +1070,7 @@ install_x-ui() {
 │  ${blue}x-ui disable${plain}          - 禁用开机自启                         │
 │  ${blue}x-ui log${plain}              - 查看日志                             │
 │  ${blue}x-ui banlog${plain}           - 查看 Fail2ban 封禁日志               │
-│  ${blue}x-ui update${plain}           - 重装固定版                           │
+│  ${blue}x-ui update${plain}           - 更新 JuLiang-UI                           │
 │  ${blue}x-ui legacy${plain}           - 版本说明                             │
 │  ${blue}x-ui install${plain}          - 安装                                 │
 │  ${blue}x-ui uninstall${plain}        - 卸载                                 │
