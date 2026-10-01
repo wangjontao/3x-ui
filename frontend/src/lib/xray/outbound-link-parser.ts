@@ -759,7 +759,10 @@ export function parseHysteria2Link(link: string): Raw | null {
 }
 
 export function parseSocksLink(link: string): Raw | null {
-  const url = parseUrlLink(link, 'socks') ?? parseUrlLink(link, 'socks5');
+  const trimmed = link.trim();
+  if (!/^socks5?:\/\//i.test(trimmed)) return null;
+
+  const url = parseUrlLink(trimmed, 'socks5') ?? parseUrlLink(trimmed, 'socks');
   if (!url) return null;
 
   const address = url.hostname;
