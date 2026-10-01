@@ -786,6 +786,133 @@ export function parseSocksLink(link: string): Raw | null {
   };
 }
 
+
+export interface SocksBatchParseError {
+  line: number;
+  input: string;
+  reason: string;
+}
+
+export interface SocksBatchParseResult {
+  outbounds: Raw[];
+  errors: SocksBatchParseError[];
+}
+
+/*
+ * JuLiang bulk SOCKS5 importer.
+ *
+ * Supported per-line formats:
+ *   socks5://user:pass@host:port#remark
+ *   socks://user:pass@host:port#remark
+ *   host|port|user|pass|remark
+ *   host:port:user:pass[:remark]   (IPv4/domain compact form)
+ *
+ * Blank lines and lines beginning with # are ignored.  The caller supplies
+ * tags that already exist in the Xray template; duplicate/missing remarks are
+ * made unique automatically so a large provider list can be pasted at once.
+ */
+export function parseSocksBatch(
+  input: string,
+  existingTags: Iterable<string> = [],
+): SocksBatchParseResult {
+  const outbounds: Raw[] = [];
+  const errors: SocksBatchParseError[] = [];
+  const usedTags = new Set(Array.from(existingTags, (tag) => tag.trim()).filter(Boolean));
+
+  const uniqueTag = (preferred: string, address: string, ordinal: number): string => {
+    const base = preferred.trim() || `SK5-${String(ordinal).padStart(3, '0')}-${address}`;
+    let candidate = base;
+    let suffix = 2;
+    while (usedTags.has(candidate)) {
+      candidate = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    usedTags.add(candidate);
+    return candidate;
+  };
+
+  const fromParts = (
+    addressRaw: string,
+    portRaw: string,
+    userRaw: string,
+    passRaw: string,
+    remarkRaw: string,
+  ): Raw | null => {
+    const address = addressRaw.trim();
+    const portText = portRaw.trim();
+    const port = Number(portText);
+    const user = userRaw.trim();
+    const pass = passRaw.trim();
+    if (!address || !/^\d+$/.test(portText) || !Number.isInteger(port) || port < 1 || port > 65535)
+      return null;
+    // A half-filled credential pair is almost always a pasted-format error.
+    if ((user && !pass) || (!user && pass)) return null;
+    return {
+      protocol: 'socks',
+      tag: remarkRaw.trim(),
+      settings: {
+        servers: [{ address, port, users: user && pass ? [{ user, pass }] : [] }],
+      },
+    };
+  };
+
+  const lines = input.split(/\r?\n/);
+  let ordinal = 0;
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) return;
+    ordinal += 1;
+
+    let parsed: Raw | null = null;
+    if (/^socks5?:\/\//i.test(line)) {
+      parsed = parseSocksLink(line);
+    } else if (line.includes('|')) {
+      const parts = line.split('|');
+      if (parts.length >= 2) {
+        parsed = fromParts(
+          parts[0] ?? '',
+          parts[1] ?? '',
+          parts[2] ?? '',
+          parts[3] ?? '',
+          parts.slice(4).join('|'),
+        );
+      }
+    } else {
+      // Convenience for the common provider export "host:port:user:pass".
+      // Keep this deliberately IPv4/domain-only so IPv6 colons are never
+      // interpreted ambiguously; IPv6 users can use the pipe or URL forms.
+      const compact = /^([^:\s]+):(\d+):([^:]*):([^:]*)(?::(.*))?$/.exec(line);
+      if (compact) {
+        parsed = fromParts(
+          compact[1] ?? '',
+          compact[2] ?? '',
+          compact[3] ?? '',
+          compact[4] ?? '',
+          compact[5] ?? '',
+        );
+      }
+    }
+
+    if (!parsed) {
+      errors.push({
+        line: index + 1,
+        input: rawLine,
+        reason: 'invalid SOCKS5 line',
+      });
+      return;
+    }
+
+    const settings = parsed.settings as {
+      servers?: Array<{ address?: unknown }>;
+    };
+    const address = String(settings?.servers?.[0]?.address ?? 'proxy');
+    parsed.tag = uniqueTag(typeof parsed.tag === 'string' ? parsed.tag : '', address, ordinal);
+    outbounds.push(parsed);
+  });
+
+  return { outbounds, errors };
+}
+
 function firstParam(params: URLSearchParams, ...keys: string[]): string | null {
   for (const k of keys) {
     const v = params.get(k);
