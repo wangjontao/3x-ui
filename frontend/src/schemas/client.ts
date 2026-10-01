@@ -56,6 +56,7 @@ export const ClientRecordSchema = z
     forwardedPorts: z.string().optional(),
     secret: z.string().optional(),
     adTag: z.string().optional(),
+    outboundTag: z.string().optional(),
     createdAt: z.number().optional(),
     updatedAt: z.number().optional(),
   })
@@ -338,6 +339,7 @@ export const ClientFormSchema = z.object({
   tgId: z.number().int().min(0),
   group: z.string(),
   comment: z.string(),
+  outboundTag: z.string(),
   enable: z.boolean(),
   inboundIds: z.array(z.number()),
 });
