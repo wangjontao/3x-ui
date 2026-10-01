@@ -25,6 +25,7 @@ import {
   InfoCircleOutlined,
   DeleteOutlined,
   SearchOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 
 import { HttpUtil } from '@/utils';
@@ -34,6 +35,7 @@ import { buildRowActionsMenu } from './RowActions';
 import { useInboundColumns } from './useInboundColumns';
 import { buildHostRemarksByInboundId, formatHostRemarksLabel } from './helpers';
 import InboundStatsModal from './InboundStatsModal';
+import InboundClientRows from './InboundClientRows';
 import type { DBInboundRecord, GeneralAction, InboundListProps, RowAction } from './types';
 import './InboundList.css';
 
@@ -61,8 +63,11 @@ export default function InboundList({
   hasActiveNode,
   hosts,
   onAddInbound,
+  onOneClick,
   onGeneralAction,
   onRowAction,
+  onClientAction,
+  onClientEnable,
   onBulkDelete,
 }: InboundListProps) {
   const { t } = useTranslation();
@@ -194,7 +199,12 @@ export default function InboundList({
   const generalActionsMenu: MenuProps = {
     items: [
       { key: 'import', icon: <ImportOutlined />, label: t('pages.inbounds.importInbound') },
-      { key: 'export', icon: <ExportOutlined />, label: t('pages.inbounds.export') },
+      { key: 'export', icon: <ExportOutlined />, label: t('pages.inbounds.exportClientLinks') },
+      {
+        key: 'exportClients',
+        icon: <ExportOutlined />,
+        label: t('pages.inbounds.exportClientsConfig'),
+      },
       ...(subEnable
         ? [
             {
@@ -215,7 +225,6 @@ export default function InboundList({
 
   return (
     <Card
-      hoverable
       title={
         <Space>
           <Button
@@ -235,6 +244,14 @@ export default function InboundList({
               {!isMobile && t('pages.inbounds.generalActions')}
             </Button>
           </Dropdown>
+          <Button
+            type="primary"
+            icon={<ThunderboltOutlined />}
+            onClick={onOneClick}
+            aria-label={t('pages.inbounds.oneClick.title')}
+          >
+            {!isMobile && t('pages.inbounds.oneClick.title')}
+          </Button>
           {showNodeFilter && (
             <Select
               value={nodeFilter}
@@ -371,7 +388,19 @@ export default function InboundList({
               onChange: (keys: Key[]) => setSelectedRowKeys(keys as number[]),
             }}
             pagination={paginationFor(visibleInbounds)}
-            scroll={{ x: tableScrollX }}
+            expandable={{
+              expandedRowRender: (record) => (
+                <InboundClientRows
+                  record={record}
+                  rollup={clientCount[record.id]}
+                  onAction={onClientAction}
+                  onEnable={onClientEnable}
+                />
+              ),
+              rowExpandable: (record) => (clientCount[record.id]?.clients || 0) > 0,
+              columnWidth: 36,
+            }}
+            scroll={{ x: tableScrollX + 36 }}
             style={{ marginTop: 10 }}
             size="small"
             locale={{

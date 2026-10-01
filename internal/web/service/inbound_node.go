@@ -1235,21 +1235,32 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 			}
 		}
 		if len(localEmails) > 0 {
+			// These fields are authored centrally and are not part of the Xray
+			// inbound client wire shape. Overlay them before SyncInbound so a
+			// remote snapshot cannot erase panel-only metadata.
 			var localMeta []struct {
-				Email   string
-				Comment string `gorm:"column:comment"`
+				Email       string
+				Comment     string `gorm:"column:comment"`
+				OutboundTag string `gorm:"column:outbound_tag"`
 			}
 			if err := tx.Table("clients").
-				Select("email, comment").
+				Select("email, comment, outbound_tag").
 				Where("email IN ?", localEmails).
 				Find(&localMeta).Error; err == nil {
-				commentByEmail := make(map[string]string, len(localMeta))
+				metaByEmail := make(map[string]struct {
+					Comment     string
+					OutboundTag string
+				}, len(localMeta))
 				for _, m := range localMeta {
-					commentByEmail[m.Email] = m.Comment
+					metaByEmail[m.Email] = struct {
+						Comment     string
+						OutboundTag string
+					}{Comment: m.Comment, OutboundTag: m.OutboundTag}
 				}
 				for i := range filtered {
-					if cmt, ok := commentByEmail[filtered[i].Email]; ok {
-						filtered[i].Comment = cmt
+					if meta, ok := metaByEmail[filtered[i].Email]; ok {
+						filtered[i].Comment = meta.Comment
+						filtered[i].OutboundTag = meta.OutboundTag
 					}
 				}
 			}

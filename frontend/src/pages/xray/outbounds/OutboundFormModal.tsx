@@ -580,7 +580,7 @@ export default function OutboundFormModal({
                     >
                       <Input.Search
                         value={linkInput}
-                        placeholder="vmess:// vless:// trojan:// ss:// hysteria2:// wireguard://"
+                        placeholder="vmess:// vless:// trojan:// ss:// socks:// socks5:// hysteria2:// wireguard://"
                         enterButton="Import"
                         onChange={(e) => setLinkInput(e.target.value)}
                         onSearch={importLink}

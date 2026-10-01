@@ -259,6 +259,20 @@ func (s *ClientService) Create(inboundSvc *InboundService, payload *ClientCreate
 	// A re-created email is a live identity again: a delete tombstone left
 	// standing makes the next node merge prune the new client's inbound links.
 	withdrawClientTombstones(client.Email)
+	// outboundTag is panel-only routing metadata. Persist it explicitly so a
+	// client can select or clear its landing route without depending on how an
+	// inbound protocol serializes its user object.
+	clientOutboundTag := strings.TrimSpace(client.OutboundTag)
+	if err := database.GetDB().Model(&model.ClientRecord{}).
+		Where("email = ?", client.Email).
+		UpdateColumn("outbound_tag", clientOutboundTag).Error; err != nil {
+		return needRestart, err
+	}
+	// Adding the user itself is hot-appliable, but the generated user->egress
+	// routing rule is part of the full Xray config.
+	if clientOutboundTag != "" {
+		needRestart = true
+	}
 	return needRestart, s.setClientLimitHwidByEmail(client.Email, payload.LimitHwid)
 }
 
@@ -462,6 +476,9 @@ func mtprotoDomainFromSettings(settings string) string {
 }
 
 func clientWithInboundFlow(c model.Client, ib *model.Inbound) model.Client {
+	// OutboundTag is panel-only routing metadata. Never serialize it into an
+	// Xray inbound client object: Xray does not define this field there.
+	c.OutboundTag = ""
 	if ib.DisableFlow || !inboundCanEnableTlsFlow(string(ib.Protocol), ib.StreamSettings, ib.Settings) {
 		c.Flow = ""
 	}
@@ -820,6 +837,21 @@ func (s *ClientService) Update(inboundSvc *InboundService, id int, updated model
 		return needRestart, err
 	}
 
+	// Keep the client-selected landing route in the client table, including an
+	// empty value which means "use normal/direct routing".
+	oldOutboundTag := strings.TrimSpace(existing.OutboundTag)
+	newOutboundTag := strings.TrimSpace(updated.OutboundTag)
+	if err := database.GetDB().Model(&model.ClientRecord{}).
+		Where("id = ?", id).
+		UpdateColumn("outbound_tag", newOutboundTag).Error; err != nil {
+		return needRestart, err
+	}
+	// User credential edits can be applied through Xray's API, but changing the
+	// routing target needs the generated full config to be reconciled.
+	if oldOutboundTag != newOutboundTag {
+		needRestart = true
+	}
+
 	if err := database.GetDB().Model(&model.ClientRecord{}).
 		Where("id = ?", id).
 		UpdateColumn("enable", updated.Enable).Error; err != nil {
@@ -924,6 +956,9 @@ func (s *ClientService) Delete(inboundSvc *InboundService, id int, keepTraffic b
 	}); err != nil {
 		withdrawClientTombstones(existing.Email)
 		return needRestart, err
+	}
+	if strings.TrimSpace(existing.OutboundTag) != "" {
+		needRestart = true
 	}
 	return needRestart, nil
 }

@@ -48,6 +48,7 @@ import type {
   ExternalLinkInput,
 } from '@/hooks/useClients';
 import { useFail2banStatusQuery, getLimitIpNotice } from '@/api/queries/useFail2banStatusQuery';
+import { useOutboundTags } from '@/api/queries/useOutboundTags';
 import ClientRenewalFields from './ClientRenewalFields';
 import { ClientFormSchema, ClientCreateFormSchema, type ClientFormValues } from '@/schemas/client';
 import './ClientFormModal.css';
@@ -115,6 +116,7 @@ interface ClientFormModalProps {
   inbounds: InboundOption[];
   attachedExternalLinks?: ExternalLink[];
   attachedIds?: number[];
+  defaultInboundIds?: number[];
   tunnelAllowedIPs?: Record<number, string>;
   tgBotEnable?: boolean;
   groups?: string[];
@@ -165,6 +167,7 @@ const EMPTY: Values = {
   tgId: 0,
   group: '',
   comment: '',
+  outboundTag: '',
   enable: true,
   inboundIds: [],
   externalLinks: [],
@@ -247,6 +250,7 @@ export default function ClientFormModal({
   inbounds,
   attachedExternalLinks = [],
   attachedIds = [],
+  defaultInboundIds = [],
   tunnelAllowedIPs = {},
   tgBotEnable = false,
   groups = [],
@@ -255,6 +259,7 @@ export default function ClientFormModal({
   onOpenChange,
 }: ClientFormModalProps) {
   const { t } = useTranslation();
+  const { data: outboundTags = [] } = useOutboundTags({ excludeBlackhole: true });
   const [messageApi, messageContextHolder] = message.useMessage();
   const isEdit = mode === 'edit';
 
@@ -378,6 +383,7 @@ export default function ClientFormModal({
         tgId: Number(client.tgId) || 0,
         group: client.group || '',
         comment: client.comment || '',
+        outboundTag: client.outboundTag || '',
         enable: !!client.enable,
         inboundIds: Array.isArray(attachedIds) ? [...attachedIds] : [],
         externalLinks: toExternalLinkRows(attachedExternalLinks),
@@ -412,6 +418,7 @@ export default function ClientFormModal({
         subId: RandomUtil.randomLowerAndNum(16),
         password: RandomUtil.randomLowerAndNum(16),
         auth: RandomUtil.randomLowerAndNum(16),
+        inboundIds: [...defaultInboundIds],
         wgPrivateKey: wgKeypair.privateKey,
         wgPublicKey: wgKeypair.publicKey,
       });
@@ -676,6 +683,7 @@ export default function ClientFormModal({
       tgId: values.tgId,
       group: values.group,
       comment: values.comment,
+      outboundTag: values.outboundTag,
       enable: values.enable,
       inboundIds: values.inboundIds,
     });
@@ -710,6 +718,7 @@ export default function ClientFormModal({
       tgId: Number(values.tgId) || 0,
       group: values.group,
       comment: values.comment,
+      outboundTag: (values.outboundTag || '').trim(),
       enable: !!values.enable,
     };
     const reverseTagValue = showReverseTag ? (values.reverseTag || '').trim() : '';
@@ -1046,6 +1055,28 @@ export default function ClientFormModal({
                               placeholder={t('pages.clients.groupPlaceholder')}
                               options={groups.map((g) => ({ value: g }))}
                               allowClear
+                            />
+                          </FormField>
+                        </Col>
+                      </Row>
+
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <FormField
+                            name="outboundTag"
+                            label={t('pages.nodes.outboundTag')}
+                            transform={{ output: (v) => v ?? '' }}
+                          >
+                            <Select
+                              allowClear
+                              showSearch
+                              placeholder={t('pages.nodes.outboundTagPlaceholder')}
+                              options={outboundTags.map((tag) => ({ label: tag, value: tag }))}
+                              filterOption={(input, option) =>
+                                String(option?.label ?? '')
+                                  .toLowerCase()
+                                  .includes(input.toLowerCase())
+                              }
                             />
                           </FormField>
                         </Col>

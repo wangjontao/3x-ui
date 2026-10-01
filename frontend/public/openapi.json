@@ -1747,6 +1747,9 @@
             "description": "IP limit for this client",
             "type": "integer"
           },
+          "outboundTag": {
+            "type": "string"
+          },
           "password": {
             "description": "Client password",
             "type": "string"
@@ -1969,6 +1972,9 @@
           "limitIp": {
             "type": "integer"
           },
+          "outboundTag": {
+            "type": "string"
+          },
           "password": {
             "type": "string"
           },
@@ -2041,6 +2047,7 @@
           "keepAlive",
           "limitHwid",
           "limitIp",
+          "outboundTag",
           "password",
           "preSharedKey",
           "privateKey",

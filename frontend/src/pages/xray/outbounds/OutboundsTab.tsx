@@ -42,6 +42,7 @@ import { HttpUtil } from '@/utils';
 import { onNumber } from '@/utils/onNumber';
 import PromptModal from '@/components/feedback/PromptModal';
 import TextModal from '@/components/feedback/TextModal';
+import { parseSocksBatch } from '@/lib/xray/outbound-link-parser';
 
 import OutboundFormModal from './OutboundFormModal';
 import { propagateOutboundTagRename } from '../basics/helpers';
@@ -64,6 +65,8 @@ import OutboundCardList from './OutboundCardList';
 import SubscriptionOutbounds from './SubscriptionOutbounds';
 
 const defaultOutboundSubscriptionUserAgent = '3x-ui-outbound-sub/1.0';
+const JULIANG_SK5_RULE_PREFIX = 'juliang-sk5:';
+const JULIANG_SK5_UNASSIGNED_PREFIX = '__juliang_tk_unassigned__:';
 
 interface OutboundSub {
   id: number;
@@ -290,6 +293,7 @@ export default function OutboundsTab({
   }
 
   const [importOpen, setImportOpen] = useState(false);
+  const [sk5ImportOpen, setSk5ImportOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportContent, setExportContent] = useState('');
 
@@ -321,6 +325,69 @@ export default function OutboundsTab({
       tt.outbounds.push(...(list as never[]));
     });
     setImportOpen(false);
+  }
+
+  function importSk5(value: string) {
+    const occupiedTags = new Set<string>();
+    for (const outbound of templateSettings?.outbounds || []) {
+      if (outbound?.tag) occupiedTags.add(outbound.tag);
+    }
+    for (const tag of subscriptionOutboundTags || []) {
+      if (tag) occupiedTags.add(tag);
+    }
+
+    const parsed = parseSocksBatch(value, occupiedTags);
+    if (parsed.outbounds.length === 0) {
+      messageApi.error(t('pages.xray.sk5ImportInvalid'));
+      return;
+    }
+
+    mutate((tt) => {
+      if (!Array.isArray(tt.outbounds)) tt.outbounds = [];
+      tt.outbounds.push(...(parsed.outbounds as never[]));
+
+      if (!tt.routing) tt.routing = {};
+      if (!Array.isArray(tt.routing.rules)) tt.routing.rules = [];
+
+      const managedTargets = new Set(
+        tt.routing.rules
+          .filter(
+            (rule) =>
+              typeof rule.ruleTag === 'string' &&
+              rule.ruleTag.startsWith(JULIANG_SK5_RULE_PREFIX),
+          )
+          .map((rule) => rule.outboundTag)
+          .filter((tag): tag is string => typeof tag === 'string' && tag.length > 0),
+      );
+
+      for (const outbound of parsed.outbounds) {
+        const tag = typeof outbound.tag === 'string' ? outbound.tag.trim() : '';
+        if (!tag || managedTargets.has(tag)) continue;
+        tt.routing.rules.push({
+          type: 'field',
+          enabled: true,
+          comment: `JuLiang-TK SK5 · ${tag} · 客户端选择后自动绑定`,
+          user: [`${JULIANG_SK5_UNASSIGNED_PREFIX}${tag}`],
+          outboundTag: tag,
+          ruleTag: `${JULIANG_SK5_RULE_PREFIX}${tag}`,
+        });
+        managedTargets.add(tag);
+      }
+    });
+
+    messageApi.success(`${t('pages.xray.sk5ImportSuccess')}: ${parsed.outbounds.length}`);
+    if (parsed.errors.length > 0) {
+      const lines = parsed.errors
+        .slice(0, 8)
+        .map((error) => error.line)
+        .join(', ');
+      const more = parsed.errors.length > 8 ? '…' : '';
+      messageApi.warning(
+        `${t('pages.xray.sk5ImportSkipped')}: ${parsed.errors.length} (${lines}${more})`,
+        8,
+      );
+    }
+    setSk5ImportOpen(false);
   }
 
   // --- Subscription management (minimal inline UI) ---
@@ -560,6 +627,9 @@ export default function OutboundsTab({
               <Button icon={<CloudOutlined />} onClick={openSubManager}>
                 {t('pages.xray.outboundSub.manage')}
               </Button>
+              <Button icon={<ImportOutlined />} onClick={() => setSk5ImportOpen(true)}>
+                {!isMobile && t('pages.xray.sk5Import')}
+              </Button>
               <Dropdown
                 trigger={['click']}
                 menu={{
@@ -674,6 +744,15 @@ export default function OutboundsTab({
           type="textarea"
           json
           onConfirm={importOutbounds}
+        />
+        <PromptModal
+          open={sk5ImportOpen}
+          onClose={() => setSk5ImportOpen(false)}
+          title={t('pages.xray.sk5Import')}
+          okText={t('pages.xray.sk5Import')}
+          type="textarea"
+          placeholder={t('pages.xray.sk5ImportPlaceholder')}
+          onConfirm={importSk5}
         />
         <TextModal
           open={exportOpen}

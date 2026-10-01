@@ -1,5 +1,6 @@
 import { lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router';
 import {
   Button,
   Card,
@@ -46,9 +47,11 @@ import type { TextModalTab } from '@/components/feedback/TextModal';
 const PromptModal = lazy(() => import('@/components/feedback/PromptModal'));
 
 import { useInbounds } from './useInbounds';
+import { useClients } from '@/hooks/useClients';
 import { InboundList } from './list';
 import { LazyMount } from '@/components/utility';
 const InboundFormModal = lazy(() => import('./form/InboundFormModal'));
+const OneClickInboundModal = lazy(() => import('./OneClickInboundModal'));
 const CloneInboundModal = lazy(() => import('./CloneInboundModal'));
 const InboundInfoModal = lazy(() => import('./info/InboundInfoModal'));
 const QrCodeModal = lazy(() => import('./qr/QrCodeModal'));
@@ -56,9 +59,14 @@ const AttachClientsModal = lazy(() => import('./clients/AttachClientsModal'));
 const AttachExistingClientsModal = lazy(() => import('./clients/AttachExistingClientsModal'));
 const DetachClientsModal = lazy(() => import('./clients/DetachClientsModal'));
 const AddClientsToGroupModal = lazy(() => import('./clients/AddClientsToGroupModal'));
+const ClientFormModal = lazy(() => import('../clients/ClientFormModal'));
+const ClientBulkAddModal = lazy(() => import('../clients/ClientBulkAddModal'));
 
 type RowAction =
   | 'edit'
+  | 'addClient'
+  | 'bulkCreateClients'
+  | 'resetClientsTraffic'
   | 'showInfo'
   | 'qrcode'
   | 'export'
@@ -73,7 +81,7 @@ type RowAction =
   | 'addToGroup'
   | 'clone';
 
-type GeneralAction = 'import' | 'export' | 'subs' | 'resetInbounds';
+type GeneralAction = 'import' | 'export' | 'exportClients' | 'subs' | 'resetInbounds';
 
 interface ClientMatchTarget {
   id?: string;
@@ -83,6 +91,7 @@ interface ClientMatchTarget {
 
 export default function InboundsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { isDark, isUltra, antdThemeConfig } = useTheme();
   const { isMobile } = useMediaQuery();
 
@@ -162,6 +171,7 @@ export default function InboundsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [formDbInbound, setFormDbInbound] = useState<DBInbound | null>(null);
+  const [oneClickOpen, setOneClickOpen] = useState(false);
 
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoDbInbound, setInfoDbInbound] = useState<DBInbound | null>(null);
@@ -169,6 +179,7 @@ export default function InboundsPage() {
 
   const [qrOpen, setQrOpen] = useState(false);
   const [qrDbInbound, setQrDbInbound] = useState<DBInbound | null>(null);
+  const [qrClient, setQrClient] = useState<Record<string, unknown> | null>(null);
 
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachSource, setAttachSource] = useState<DBInbound | null>(null);
@@ -182,6 +193,20 @@ export default function InboundsPage() {
 
   const [cloneOpen, setCloneOpen] = useState(false);
   const [cloneSource, setCloneSource] = useState<DBInbound | null>(null);
+
+  const [clientFormOpen, setClientFormOpen] = useState(false);
+  const [clientFormInboundIds, setClientFormInboundIds] = useState<number[]>([]);
+  const [clientBulkOpen, setClientBulkOpen] = useState(false);
+  const [clientBulkInboundIds, setClientBulkInboundIds] = useState<number[]>([]);
+
+  const {
+    inbounds: clientInboundOptions,
+    create: createClient,
+    setExternalLinks: setClientExternalLinks,
+  } = useClients({
+    list: false,
+    inbounds: clientFormOpen || clientBulkOpen,
+  });
 
   const [textOpen, setTextOpen] = useState(false);
   const [textTitle, setTextTitle] = useState('');
@@ -321,6 +346,10 @@ export default function InboundsPage() {
       clients?: ClientMatchTarget[];
     };
     const clients = settings.clients || [];
+    if (client.email) {
+      const byEmail = clients.findIndex((c) => c?.email === client.email);
+      if (byEmail >= 0) return byEmail;
+    }
     const idx = clients.findIndex((c) => {
       if (!c) return false;
       switch (dbInbound.protocol) {
@@ -420,6 +449,17 @@ export default function InboundsPage() {
       title: t('pages.inbounds.exportAllLinksTitle'),
       content: links.join('\r\n'),
       fileName: t('pages.inbounds.exportAllLinksFileName'),
+    });
+  }, [openText, t]);
+
+  const exportClientsConfig = useCallback(async () => {
+    const msg = await HttpUtil.get('/panel/api/clients/export');
+    const clients = msg?.success && Array.isArray(msg.obj) ? msg.obj : [];
+    openText({
+      title: t('pages.inbounds.exportClientsConfigTitle'),
+      content: JSON.stringify(clients, null, 2),
+      fileName: t('pages.inbounds.exportClientsConfigFileName'),
+      json: true,
     });
   }, [openText, t]);
 
@@ -607,6 +647,9 @@ export default function InboundsPage() {
         case 'export':
           exportAllLinks();
           break;
+        case 'exportClients':
+          exportClientsConfig();
+          break;
         case 'subs':
           exportAllSubs();
           break;
@@ -625,7 +668,16 @@ export default function InboundsPage() {
           messageApi.info(`General action "${key}" — coming in a later 5f subphase`);
       }
     },
-    [modal, importInbound, exportAllLinks, exportAllSubs, refresh, messageApi, t],
+    [
+      modal,
+      importInbound,
+      exportAllLinks,
+      exportClientsConfig,
+      exportAllSubs,
+      refresh,
+      messageApi,
+      t,
+    ],
   );
 
   const onRowAction = useCallback(
@@ -636,6 +688,7 @@ export default function InboundsPage() {
       const hydratingKeys: RowAction[] = [
         'edit',
         'showInfo',
+        'resetClientsTraffic',
         'qrcode',
         'export',
         'subs',
@@ -653,12 +706,45 @@ export default function InboundsPage() {
         case 'edit':
           openEdit(target);
           break;
+        case 'addClient':
+          setClientFormInboundIds([target.id]);
+          setClientFormOpen(true);
+          break;
+        case 'bulkCreateClients':
+          setClientBulkInboundIds([target.id]);
+          setClientBulkOpen(true);
+          break;
+        case 'resetClientsTraffic': {
+          const settings = coerceInboundJsonField(target.settings) as {
+            clients?: Array<{ email?: string }>;
+          };
+          const emails = (settings.clients || [])
+            .map((client) => (client.email || '').trim())
+            .filter(Boolean);
+          if (emails.length === 0) break;
+          modal.confirm({
+            title: t('pages.inbounds.resetClientsTraffic'),
+            content: t('pages.inbounds.resetClientsTrafficConfirm', { count: emails.length }),
+            okText: t('reset'),
+            cancelText: t('cancel'),
+            onOk: async () => {
+              const msg = await HttpUtil.post(
+                '/panel/api/clients/bulkResetTraffic',
+                { emails },
+                { headers: { 'Content-Type': 'application/json' } },
+              );
+              if (msg?.success) await refresh();
+            },
+          });
+          break;
+        }
         case 'showInfo':
           setInfoDbInbound(checkFallback(target));
           setInfoClientIndex(findClientIndex(target, null));
           setInfoOpen(true);
           break;
         case 'qrcode':
+          setQrClient(null);
           setQrDbInbound(checkFallback(target));
           setQrOpen(true);
           break;
@@ -715,8 +801,72 @@ export default function InboundsPage() {
       confirmResetTraffic,
       confirmDelAllClients,
       confirmClone,
+      modal,
+      refresh,
+      t,
       messageApi,
     ],
+  );
+
+  const onClientEnable = useCallback(
+    async (email: string, enable: boolean) => {
+      const path = enable ? '/panel/api/clients/bulkEnable' : '/panel/api/clients/bulkDisable';
+      const msg = await HttpUtil.post(
+        path,
+        { emails: [email] },
+        { headers: { 'Content-Type': 'application/json' }, silentSuccess: true },
+      );
+      if (msg?.success) await refresh();
+    },
+    [refresh],
+  );
+
+  const onClientAction = useCallback(
+    async ({
+      key,
+      dbInbound,
+      email,
+    }: {
+      key: 'qrcode' | 'info' | 'manage' | 'resetTraffic';
+      dbInbound: DBInbound;
+      email: string;
+    }) => {
+      if (key === 'manage') {
+        navigate(`/clients?search=${encodeURIComponent(email)}`);
+        return;
+      }
+      if (key === 'resetTraffic') {
+        const msg = await HttpUtil.post(
+          `/panel/api/clients/resetTraffic/${encodeURIComponent(email)}`,
+        );
+        if (msg?.success) await refresh();
+        return;
+      }
+
+      const hydrated = (await hydrateInbound(dbInbound.id)) ?? dbInbound;
+      const settings = coerceInboundJsonField(hydrated.settings) as {
+        clients?: Array<Record<string, unknown> & { email?: string }>;
+      };
+      const client = (settings.clients || []).find((row) => row.email === email) ?? null;
+      const projected = checkFallback(hydrated);
+
+      if (key === 'qrcode') {
+        setQrClient(client);
+        setQrDbInbound(projected);
+        setQrOpen(true);
+        return;
+      }
+
+      setInfoDbInbound(projected);
+      setInfoClientIndex(findClientIndex(hydrated, { email }));
+      setInfoOpen(true);
+    },
+    [checkFallback, findClientIndex, hydrateInbound, navigate, refresh],
+  );
+
+  const totalClients = useMemo(
+    () => Object.values(clientCount).reduce((sum, item) => sum + (item?.clients || 0), 0),
+    [clientCount],
   );
 
   return (
@@ -756,9 +906,9 @@ export default function InboundsPage() {
               ) : (
                 <Row gutter={[isMobile ? 8 : 16, 12]}>
                   <Col span={24}>
-                    <Card size="small" hoverable className="summary-card">
+                    <Card size="small" className="summary-card">
                       <Row gutter={[16, 12]}>
-                        <Col xs={12} sm={12} md={8}>
+                        <Col xs={12} sm={12} md={6}>
                           <Statistic
                             title={t('pages.inbounds.totalDownUp')}
                             value={0}
@@ -771,18 +921,24 @@ export default function InboundsPage() {
                             )}
                           />
                         </Col>
-                        <Col xs={12} sm={12} md={8}>
+                        <Col xs={12} sm={12} md={6}>
                           <Statistic
                             title={t('pages.inbounds.totalUsage')}
                             value={SizeFormatter.sizeFormat(totals.up + totals.down)}
                             prefix={<PieChartOutlined />}
                           />
                         </Col>
-                        <Col xs={24} sm={24} md={8}>
+                        <Col xs={12} sm={12} md={6}>
                           <Statistic
                             title={t('pages.inbounds.inboundCount')}
                             value={String(dbInbounds.length)}
                             prefix={<BarsOutlined />}
+                          />
+                        </Col>
+                        <Col xs={12} sm={12} md={6}>
+                          <Statistic
+                            title={t('clients')}
+                            value={String(totalClients)}
                           />
                         </Col>
                       </Row>
@@ -805,10 +961,19 @@ export default function InboundsPage() {
                       hasActiveNode={showNodeInfo}
                       hosts={hosts}
                       onAddInbound={onAddInbound}
+                      onOneClick={() => setOneClickOpen(true)}
                       onGeneralAction={onGeneralAction}
                       onRowAction={({ key, dbInbound }) =>
                         onRowAction({ key, dbInbound: dbInbound as unknown as DBInbound })
                       }
+                      onClientAction={({ key, dbInbound, email }) =>
+                        onClientAction({
+                          key,
+                          dbInbound: dbInbound as unknown as DBInbound,
+                          email,
+                        })
+                      }
+                      onClientEnable={onClientEnable}
                       onBulkDelete={confirmBulkDelete}
                     />
                   </Col>
@@ -818,6 +983,14 @@ export default function InboundsPage() {
           </Layout.Content>
         </Layout>
 
+        <LazyMount when={oneClickOpen}>
+          <OneClickInboundModal
+            open={oneClickOpen}
+            usedPorts={dbInbounds.filter((ib) => ib.nodeId == null).map((ib) => ib.port)}
+            onClose={() => setOneClickOpen(false)}
+            onCreated={refresh}
+          />
+        </LazyMount>
         <LazyMount when={formOpen}>
           <InboundFormModal
             open={formOpen}
@@ -830,6 +1003,38 @@ export default function InboundsPage() {
             availableNodesFetched={nodesFetched}
           />
         </LazyMount>
+        <LazyMount when={clientFormOpen}>
+          <ClientFormModal
+            open={clientFormOpen}
+            mode="add"
+            client={null}
+            inbounds={clientInboundOptions}
+            defaultInboundIds={clientFormInboundIds}
+            tgBotEnable={tgBotEnable}
+            save={async (payload, meta) => {
+              if (meta.isEdit) return null;
+              const msg = await createClient(payload);
+              if (!msg?.success) return msg;
+              if (meta.email && meta.externalLinks.length > 0) {
+                const linksMsg = await setClientExternalLinks(meta.email, meta.externalLinks);
+                if (!linksMsg?.success) return linksMsg;
+              }
+              await refresh();
+              return msg;
+            }}
+            onOpenChange={setClientFormOpen}
+          />
+        </LazyMount>
+        <LazyMount when={clientBulkOpen}>
+          <ClientBulkAddModal
+            open={clientBulkOpen}
+            inbounds={clientInboundOptions}
+            defaultInboundIds={clientBulkInboundIds}
+            onOpenChange={setClientBulkOpen}
+            onSaved={refresh}
+          />
+        </LazyMount>
+
         <LazyMount when={infoOpen}>
           <InboundInfoModal
             open={infoOpen}
@@ -851,7 +1056,7 @@ export default function InboundsPage() {
             open={qrOpen}
             onClose={() => setQrOpen(false)}
             dbInbound={qrDbInbound}
-            client={null}
+            client={qrClient}
             nodeAddress={qrNodeAddress}
             subSettings={subSettings}
             hosts={hosts}

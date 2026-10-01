@@ -69,6 +69,7 @@ interface ClientBulkAddModalProps {
   open: boolean;
   inbounds: InboundOption[];
   groups?: string[];
+  defaultInboundIds?: number[];
   onOpenChange: (open: boolean) => void;
   onSaved?: () => void;
 }
@@ -77,6 +78,7 @@ export default function ClientBulkAddModal({
   open,
   inbounds,
   groups = [],
+  defaultInboundIds = [],
   onOpenChange,
   onSaved,
 }: ClientBulkAddModalProps) {
@@ -103,7 +105,7 @@ export default function ClientBulkAddModal({
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      methods.reset(EMPTY);
+      methods.reset({ ...EMPTY, inboundIds: [...defaultInboundIds] });
       setDelayedStart(false);
     }
   }

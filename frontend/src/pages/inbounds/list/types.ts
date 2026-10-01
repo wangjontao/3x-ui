@@ -36,6 +36,14 @@ export interface DBInboundRecord extends ProtocolFlags {
   nodeId?: number | null;
   settings: unknown;
   streamSettings: unknown;
+  clientStats?: Array<{
+    email: string;
+    up: number;
+    down: number;
+    total: number;
+    expiryTime: number;
+    enable?: boolean;
+  }>;
 }
 
 export interface ClientCountEntry {
@@ -54,6 +62,9 @@ export interface InboundSpeedEntry {
 
 export type RowAction =
   | 'edit'
+  | 'addClient'
+  | 'bulkCreateClients'
+  | 'resetClientsTraffic'
   | 'showInfo'
   | 'qrcode'
   | 'export'
@@ -64,7 +75,9 @@ export type RowAction =
   | 'delAllClients'
   | 'clone';
 
-export type GeneralAction = 'import' | 'export' | 'subs' | 'resetInbounds';
+export type GeneralAction = 'import' | 'export' | 'exportClients' | 'subs' | 'resetInbounds';
+
+export type ClientRowAction = 'qrcode' | 'info' | 'manage' | 'resetTraffic';
 
 export interface InboundListProps {
   dbInbounds: DBInboundRecord[];
@@ -81,7 +94,14 @@ export interface InboundListProps {
   hasActiveNode: boolean;
   hosts: HostRecord[];
   onAddInbound: () => void;
+  onOneClick: () => void;
   onGeneralAction: (key: GeneralAction) => void;
   onRowAction: (action: { key: RowAction; dbInbound: DBInboundRecord }) => void;
+  onClientAction: (action: {
+    key: ClientRowAction;
+    dbInbound: DBInboundRecord;
+    email: string;
+  }) => void;
+  onClientEnable: (email: string, enable: boolean) => Promise<void>;
   onBulkDelete: (ids: number[]) => Promise<boolean>;
 }

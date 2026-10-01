@@ -7,6 +7,8 @@ import {
   parseVlessLink,
   parseVmessLink,
   parseHysteria2Link,
+  parseSocksLink,
+  parseSocksBatch,
   parseWireguardLink,
 } from '@/lib/xray/outbound-link-parser';
 import { Base64 } from '@/utils';
@@ -449,6 +451,97 @@ describe('parseShadowsocksLink', () => {
     const settings = out?.settings as { servers: Array<{ method: string; password: string }> };
     expect(settings.servers[0].method).toBe(method);
     expect(settings.servers[0].password).toBe(password);
+  });
+});
+
+describe('parseSocksLink', () => {
+  it('parses socks5:// username:password@host:port links', () => {
+    const out = parseSocksLink(
+      'socks5://jul%40user:p%40ss@example.com:1088#US-ATT',
+    );
+    expect(out).not.toBeNull();
+    expect(out?.protocol).toBe('socks');
+    expect(out?.tag).toBe('US-ATT');
+    expect(out?.settings).toEqual({
+      servers: [
+        {
+          address: 'example.com',
+          port: 1088,
+          users: [{ user: 'jul@user', pass: 'p@ss' }],
+        },
+      ],
+    });
+  });
+
+  it('accepts socks:// and anonymous proxies', () => {
+    const out = parseSocksLink('socks://127.0.0.1:1080#local');
+    expect(out?.settings).toEqual({
+      servers: [{ address: '127.0.0.1', port: 1080, users: [] }],
+    });
+  });
+
+  it('is included in the generic outbound-link dispatcher', () => {
+    expect(parseOutboundLink('socks5://u:p@proxy.example:9000#landing')?.protocol).toBe('socks');
+  });
+
+  it('returns null for unrelated links', () => {
+    expect(parseSocksLink('vless://uuid@example.com:443')).toBeNull();
+  });
+});
+
+describe('parseSocksBatch', () => {
+  it('imports mixed socks5 URLs and pipe rows in one paste', () => {
+    const parsed = parseSocksBatch(
+      [
+        'socks5://user1:pass1@1.2.3.4:1080#US-ATT',
+        '5.6.7.8|2080|user2|pass2|US-Comcast',
+        'proxy.example:3080:user3:pass3:US-Cox',
+      ].join('\n'),
+    );
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.outbounds).toHaveLength(3);
+    expect(parsed.outbounds.map((o) => o.tag)).toEqual(['US-ATT', 'US-Comcast', 'US-Cox']);
+    expect((parsed.outbounds[1].settings as Record<string, unknown>).servers).toEqual([
+      {
+        address: '5.6.7.8',
+        port: 2080,
+        users: [{ user: 'user2', pass: 'pass2' }],
+      },
+    ]);
+  });
+
+  it('auto-generates missing tags and avoids existing/duplicate tag collisions', () => {
+    const parsed = parseSocksBatch(
+      [
+        '10.0.0.1|1080|u|p|US',
+        '10.0.0.2|1080|u|p|US',
+        '10.0.0.3|1080|u|p|',
+      ].join('\n'),
+      ['US'],
+    );
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.outbounds.map((o) => o.tag)).toEqual([
+      'US-2',
+      'US-3',
+      'SK5-003-10.0.0.3',
+    ]);
+  });
+
+  it('keeps valid rows and reports malformed rows instead of aborting the whole paste', () => {
+    const parsed = parseSocksBatch(
+      [
+        '# provider export',
+        '1.1.1.1|1080|good|secret|one',
+        'bad-row',
+        '2.2.2.2|70000|u|p|bad-port',
+        '3.3.3.3|1080|only-user||half-auth',
+      ].join('\n'),
+    );
+
+    expect(parsed.outbounds).toHaveLength(1);
+    expect(parsed.errors.map((e) => e.line)).toEqual([3, 4, 5]);
   });
 });
 
@@ -945,8 +1038,12 @@ describe('parseOutboundLink dispatcher', () => {
     ).toBe('wireguard');
   });
 
-  it('returns null for an unknown scheme', () => {
-    expect(parseOutboundLink('socks5://user:pass@host:1080')).toBeNull();
+  it('dispatches SOCKS5 via URL', () => {
+    expect(parseOutboundLink('socks5://user:pass@host:1080')?.protocol).toBe('socks');
+  });
+
+  it('returns null for a genuinely unknown scheme', () => {
+    expect(parseOutboundLink('unknown://user:pass@host:1080')).toBeNull();
   });
 
   it('returns null for empty input', () => {
