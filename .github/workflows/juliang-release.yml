@@ -1,0 +1,207 @@
+name: JuLiang-UI Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - juliang-ui-v1
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - "**.sh"
+      - "frontend/**"
+      - "internal/web/translation/**"
+      - "x-ui.service.debian"
+      - "x-ui.service.arch"
+      - "x-ui.service.rhel"
+      - "x-ui.rc"
+      - ".github/workflows/juliang-release.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: juliang-release
+  cancel-in-progress: false
+
+jobs:
+  build-linux:
+    name: Build Linux ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - amd64
+          - arm64
+
+    steps:
+      - name: Checkout JuLiang-UI
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Test JuLiang SOCKS5 import
+        working-directory: frontend
+        run: npm test -- src/test/outbound-link-parser.test.ts
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Test JuLiang client egress
+        run: go test ./internal/web/service -run 'Test(InjectClientEgress.*|ClientWithInboundFlowStripsPanelOutboundTag)$' -count=1
+
+      - name: Build static panel
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 3"
+          export CGO_ENABLED=1
+          export GOOS=linux
+          export GOARCH="${{ matrix.platform }}"
+
+          case "${{ matrix.platform }}" in
+            amd64) BOOTLIN_ARCH="x86-64" ;;
+            arm64) BOOTLIN_ARCH="aarch64" ;;
+          esac
+
+          TARBALL_BASE="https://toolchains.bootlin.com/downloads/releases/toolchains/${BOOTLIN_ARCH}/tarballs/"
+          TARBALL_NAME=$(curl -fsSL $CURL_RETRY "$TARBALL_BASE" |
+            grep -oE "${BOOTLIN_ARCH}--musl--stable-[^\"]+\\.tar\\.xz" |
+            sort -r | head -n1)
+          test -n "$TARBALL_NAME"
+
+          cd /tmp
+          curl -fLsS $CURL_RETRY -o "$TARBALL_NAME" "$TARBALL_BASE/$TARBALL_NAME"
+          tar -xf "$TARBALL_NAME"
+          TOOLCHAIN_DIR=$(find . -maxdepth 1 -type d -name "${BOOTLIN_ARCH}--musl--stable-*" | head -n1)
+          export PATH="$(realpath "$TOOLCHAIN_DIR")/bin:$PATH"
+          export CC=$(realpath "$(find "$TOOLCHAIN_DIR/bin" -name '*-gcc.br_real' -type f -executable | head -n1)")
+          test -n "$CC"
+          cd "$GITHUB_WORKSPACE"
+
+          LDFLAGS="-w -s -linkmode external -extldflags '-static'             -X github.com/mhsanaei/3x-ui/v3/internal/config.buildCommit=${GITHUB_SHA::8}             -X github.com/mhsanaei/3x-ui/v3/internal/config.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          go build -buildvcs=true -trimpath -ldflags "$LDFLAGS" -o xui-release .
+
+          mkdir -p x-ui/bin
+          install -m 755 xui-release x-ui/x-ui
+          cp x-ui.sh x-ui/
+          cp x-ui.service.debian x-ui/
+          cp x-ui.service.arch x-ui/
+          cp x-ui.service.rhel x-ui/
+
+      - name: Add Xray and runtime data
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 3"
+          cd x-ui/bin
+          XRAY_BASE="https://github.com/XTLS/Xray-core/releases/download/v26.9.9"
+
+          if [ "${{ matrix.platform }}" = "amd64" ]; then
+            XRAY_ZIP="Xray-linux-64.zip"
+          else
+            XRAY_ZIP="Xray-linux-arm64-v8a.zip"
+          fi
+          curl -fLsS $CURL_RETRY -O "${XRAY_BASE}/${XRAY_ZIP}"
+          unzip -q "${XRAY_ZIP}"
+          rm -f "${XRAY_ZIP}" geoip.dat geosite.dat
+          mv xray "xray-linux-${{ matrix.platform }}"
+
+          curl -fLsS $CURL_RETRY -o geoip.dat             https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
+          curl -fLsS $CURL_RETRY -o geosite.dat             https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+          curl -fLsS $CURL_RETRY -o geoip_IR.dat             https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
+          curl -fLsS $CURL_RETRY -o geosite_IR.dat             https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
+          curl -fLsS $CURL_RETRY -o geoip_RU.dat             https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat
+          curl -fLsS $CURL_RETRY -o geosite_RU.dat             https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat
+
+          MTG_VER=$(curl -sf $CURL_RETRY -o /dev/null -w '%{redirect_url}'             https://github.com/mhsanaei/mtg-multi/releases/latest | sed -n 's#.*/releases/tag/##p')
+          if [ -n "$MTG_VER" ]; then
+            MTG_PKG="mtg-multi-${MTG_VER#v}-linux-${{ matrix.platform }}"
+            curl -fLsS $CURL_RETRY -O               "https://github.com/mhsanaei/mtg-multi/releases/download/${MTG_VER}/${MTG_PKG}.tar.gz"
+            tar -xzf "${MTG_PKG}.tar.gz"
+            install -m 755 "${MTG_PKG}/mtg-multi" "mtg-linux-${{ matrix.platform }}"
+            rm -rf "${MTG_PKG}" "${MTG_PKG}.tar.gz"
+          fi
+
+          if [ "${{ matrix.platform }}" = "amd64" ]; then
+            TUIC="tuic-server-1.0.0-x86_64-unknown-linux-musl"
+          else
+            TUIC="tuic-server-1.0.0-aarch64-unknown-linux-musl"
+          fi
+          curl -fLsS $CURL_RETRY -o tuic-server             "https://github.com/EAimTY/tuic/releases/download/tuic-server-1.0.0/${TUIC}"
+          chmod +x tuic-server
+
+      - name: Package and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -zcf "x-ui-linux-${{ matrix.platform }}.tar.gz" x-ui
+          sha256sum "x-ui-linux-${{ matrix.platform }}.tar.gz" >             "x-ui-linux-${{ matrix.platform }}.tar.gz.sha256"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: juliang-linux-${{ matrix.platform }}
+          path: |
+            x-ui-linux-${{ matrix.platform }}.tar.gz
+            x-ui-linux-${{ matrix.platform }}.tar.gz.sha256
+
+  publish:
+    name: Publish juliang-latest
+    needs: build-linux
+    if: github.ref == 'refs/heads/juliang-ui-v1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish fixed JuLiang release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          short="${COMMIT::8}"
+          git tag -f juliang-latest "${COMMIT}"
+          git push -f origin refs/tags/juliang-latest
+
+          notes="JuLiang-UI rolling release.
+
+          Source branch: juliang-ui-v1
+          Commit: ${COMMIT}
+          Built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          VPS installation uses these prebuilt binaries; Node.js and Go are not installed on the VPS."
+
+          if ! gh release edit juliang-latest --prerelease --latest=false               --title "JuLiang-UI ${short}" --notes "${notes}"; then
+            gh release create juliang-latest --prerelease --latest=false               --target "${COMMIT}" --title "JuLiang-UI ${short}" --notes "${notes}"
+          fi
+
+          gh release upload juliang-latest             release-artifacts/*.tar.gz release-artifacts/*.sha256 --clobber
