@@ -259,16 +259,19 @@ func injectClientEgress(cfg *xray.Config, usersByTag map[string][]string) {
 	}
 
 	managedUsed := map[string]bool{}
-	cleanedRules := make([]any, 0, len(rules))
+	// JuLiang client landing rules must always win over generic/direct rules.
+	// Keep managed rules in a separate slice and prepend them to routing.rules.
+	managedRules := make([]any, 0, len(usersByTag))
+	normalRules := make([]any, 0, len(rules))
 	for _, raw := range rules {
 		rule, ok := raw.(map[string]any)
 		if !ok {
-			cleanedRules = append(cleanedRules, raw)
+			normalRules = append(normalRules, raw)
 			continue
 		}
 		ruleTag, _ := rule["ruleTag"].(string)
 		if !strings.HasPrefix(ruleTag, juliangSK5RulePrefix) {
-			cleanedRules = append(cleanedRules, raw)
+			normalRules = append(normalRules, raw)
 			continue
 		}
 		target := strings.TrimSpace(strings.TrimPrefix(ruleTag, juliangSK5RulePrefix))
@@ -296,9 +299,11 @@ func injectClientEgress(cfg *xray.Config, usersByTag map[string][]string) {
 		} else {
 			runtimeRule["outboundTag"] = target
 		}
-		cleanedRules = append(cleanedRules, runtimeRule)
+		managedRules = append(managedRules, runtimeRule)
 	}
 
+	// If a client points to an outbound/balancer that did not originate from
+	// JuLiang's SK5 importer, still generate a highest-priority user rule.
 	generated := make([]any, 0)
 	for tag, users := range usersByTag {
 		if managedUsed[tag] || len(users) == 0 || !targetExists(tag) {
@@ -312,7 +317,9 @@ func injectClientEgress(cfg *xray.Config, usersByTag map[string][]string) {
 		}
 		generated = append(generated, rule)
 	}
-	routing["rules"] = append(generated, cleanedRules...)
+
+	priorityRules := append(generated, managedRules...)
+	routing["rules"] = append(priorityRules, normalRules...)
 	newRouting, err := json.Marshal(routing)
 	if err != nil {
 		logger.Warning("JuLiang client egress: rebuild routing failed:", err)
