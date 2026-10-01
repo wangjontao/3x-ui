@@ -758,6 +758,34 @@ export function parseHysteria2Link(link: string): Raw | null {
   };
 }
 
+export function parseSocksLink(link: string): Raw | null {
+  const url = parseUrlLink(link, 'socks') ?? parseUrlLink(link, 'socks5');
+  if (!url) return null;
+
+  const address = url.hostname;
+  const port = Number(url.port) || 1080;
+  if (!address || !Number.isInteger(port) || port < 1 || port > 65535) return null;
+
+  const decodeUserInfo = (value: string): string => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+  const user = decodeUserInfo(url.username);
+  const pass = decodeUserInfo(url.password);
+  const users = user && pass ? [{ user, pass }] : [];
+
+  return {
+    protocol: 'socks',
+    tag: decodeRemark(url),
+    settings: {
+      servers: [{ address, port, users }],
+    },
+  };
+}
+
 function firstParam(params: URLSearchParams, ...keys: string[]): string | null {
   for (const k of keys) {
     const v = params.get(k);
@@ -845,6 +873,7 @@ export function parseOutboundLink(link: string): Raw | null {
     parseTrojanLink(trimmed) ??
     parseShadowsocksLink(trimmed) ??
     parseHysteria2Link(trimmed) ??
+    parseSocksLink(trimmed) ??
     parseWireguardLink(trimmed)
   );
 }
