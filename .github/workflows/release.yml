@@ -29,7 +29,7 @@ concurrency:
 env:
   JULIANG_PANEL_VERSION: v2.9.3
   JULIANG_XRAY_VERSION: v26.4.25
-  JULIANG_RELEASE_TAG: juliang-v2.9.3-r1
+  JULIANG_RELEASE_TAG: juliang-v2.9.3-r2
 
 jobs:
   build:
@@ -154,4 +154,4 @@ jobs:
           fi
           git tag "${JULIANG_RELEASE_TAG}" "$GITHUB_SHA"
           git push origin "refs/tags/${JULIANG_RELEASE_TAG}"
-          gh release create "${JULIANG_RELEASE_TAG}"             --target "$GITHUB_SHA"             --title "JuLiang-UI Stable v2.9.3 / Xray v26.4.25"             --notes "Immutable stable line. 3x-ui is locked to v2.9.3 and Xray-core is locked to v26.4.25. This release does not follow upstream main. Future upgrades must use a separate branch/release."             release-artifacts/*.tar.gz release-artifacts/*.sha256
+          gh release create "${JULIANG_RELEASE_TAG}"             --target "$GITHUB_SHA"             --title "JuLiang-UI Stable R2 · v2.9.3 / Xray v26.4.25"             --notes "JuLiang stable R2. Locked to 3x-ui v2.9.3 and Xray-core v26.4.25. Restores SK5 bulk import, managed routing, per-client landing selection, verified one-click inbound presets, and native BBR + FQ installer setup. This stable release does not follow upstream main."             release-artifacts/*.tar.gz release-artifacts/*.sha256

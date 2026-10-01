@@ -5,7 +5,7 @@ Status: **LOCKED**
 - 3x-ui source baseline: **v2.9.3**
 - Upstream commit: `0b5c239f98fd112df10ed4846377563a391ebf60`
 - Xray-core: **v26.4.25**
-- Stable release tag: **juliang-v2.9.3-r1**
+- Stable release tag: **juliang-v2.9.3-r2**
 - Stable branch: **juliang-stable-v2.9.3**
 - Upgrade/testing branch: **juliang-next**
 
