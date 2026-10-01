@@ -26,3 +26,12 @@ Fixes per-client landing outbound persistence after editing/reopening VLESS, Tro
 Release tag: `juliang-v2.9.3-r2.2`.
 
 Fixes actual landing-route application by forcing Xray routing reload for clients using `outboundTag`, in addition to the R2.1 UI persistence fix.
+
+
+### R2.3
+
+Release tag: `juliang-v2.9.3-r2.3`.
+
+- New-client emails are generated uniquely across all inbounds.
+- Full Chinese `x-ui.sh` is restored.
+- Installer/management helper raw downloads are pinned to the immutable R2.3 tag instead of the mutable stable branch, avoiding stale CDN branch content.

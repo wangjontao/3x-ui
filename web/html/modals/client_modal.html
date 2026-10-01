@@ -64,15 +64,62 @@
                 default: return client.id;
             }
         },
-        addClient(inbound, clients) {
-            switch (inbound.protocol) {
-                case Protocols.VMESS: return clients.push(new Inbound.VmessSettings.VMESS());
-                case Protocols.VLESS: return clients.push(new Inbound.VLESSSettings.VLESS());
-                case Protocols.TROJAN: return clients.push(new Inbound.TrojanSettings.Trojan());
-                case Protocols.SHADOWSOCKS: return clients.push(new Inbound.ShadowsocksSettings.Shadowsocks(clients[0].method, RandomUtil.randomShadowsocksPassword(inbound.settings.method)));
-                case Protocols.HYSTERIA: return clients.push(new Inbound.HysteriaSettings.Hysteria());
-                default: return null;
+        getUsedEmails() {
+            const used = new Set();
+            try {
+                (app.dbInbounds || []).forEach(db => {
+                    const inbound = db.toInbound();
+                    (inbound.clients || []).forEach(c => {
+                        if (c && c.email) used.add(String(c.email).toLowerCase());
+                    });
+                });
+            } catch (e) {
+                console.warn('JuLiang: unable to collect used client emails', e);
             }
+            return used;
+        },
+        ensureUniqueEmail(client) {
+            if (!client) return client;
+            const used = this.getUsedEmails();
+            let email = String(client.email || '').trim();
+            let tries = 0;
+            while (!email || used.has(email.toLowerCase())) {
+                email = RandomUtil.randomLowerAndNum(8);
+                tries++;
+                if (tries > 64) {
+                    email = 'jl' + Date.now().toString(36) + RandomUtil.randomLowerAndNum(4);
+                    break;
+                }
+            }
+            client.email = email;
+            return client;
+        },
+        addClient(inbound, clients) {
+            let client = null;
+            switch (inbound.protocol) {
+                case Protocols.VMESS:
+                    client = new Inbound.VmessSettings.VMESS();
+                    break;
+                case Protocols.VLESS:
+                    client = new Inbound.VLESSSettings.VLESS();
+                    break;
+                case Protocols.TROJAN:
+                    client = new Inbound.TrojanSettings.Trojan();
+                    break;
+                case Protocols.SHADOWSOCKS:
+                    client = new Inbound.ShadowsocksSettings.Shadowsocks(
+                        clients[0].method,
+                        RandomUtil.randomShadowsocksPassword(inbound.settings.method)
+                    );
+                    break;
+                case Protocols.HYSTERIA:
+                    client = new Inbound.HysteriaSettings.Hysteria();
+                    break;
+                default:
+                    return null;
+            }
+            this.ensureUniqueEmail(client);
+            return clients.push(client);
         },
         close() {
             clientModal.visible = false;
