@@ -7,6 +7,7 @@ import {
   parseVlessLink,
   parseVmessLink,
   parseHysteria2Link,
+  parseSocksLink,
   parseWireguardLink,
 } from '@/lib/xray/outbound-link-parser';
 import { Base64 } from '@/utils';
@@ -449,6 +450,41 @@ describe('parseShadowsocksLink', () => {
     const settings = out?.settings as { servers: Array<{ method: string; password: string }> };
     expect(settings.servers[0].method).toBe(method);
     expect(settings.servers[0].password).toBe(password);
+  });
+});
+
+describe('parseSocksLink', () => {
+  it('parses socks5:// username:password@host:port links', () => {
+    const out = parseSocksLink(
+      'socks5://jul%40user:p%40ss@example.com:1088#US-ATT',
+    );
+    expect(out).not.toBeNull();
+    expect(out?.protocol).toBe('socks');
+    expect(out?.tag).toBe('US-ATT');
+    expect(out?.settings).toEqual({
+      servers: [
+        {
+          address: 'example.com',
+          port: 1088,
+          users: [{ user: 'jul@user', pass: 'p@ss' }],
+        },
+      ],
+    });
+  });
+
+  it('accepts socks:// and anonymous proxies', () => {
+    const out = parseSocksLink('socks://127.0.0.1:1080#local');
+    expect(out?.settings).toEqual({
+      servers: [{ address: '127.0.0.1', port: 1080, users: [] }],
+    });
+  });
+
+  it('is included in the generic outbound-link dispatcher', () => {
+    expect(parseOutboundLink('socks5://u:p@proxy.example:9000#landing')?.protocol).toBe('socks');
+  });
+
+  it('returns null for unrelated links', () => {
+    expect(parseSocksLink('vless://uuid@example.com:443')).toBeNull();
   });
 });
 
