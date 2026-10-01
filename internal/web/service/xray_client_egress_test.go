@@ -12,7 +12,7 @@ import (
 func TestInjectClientEgressOutbound(t *testing.T) {
 	cfg := &xray.Config{
 		OutboundConfigs: json_util.RawMessage(`[{"tag":"socks-us","protocol":"socks","settings":{}}]`),
-		RouterConfig: json_util.RawMessage(`{"domainStrategy":"AsIs","rules":[{"type":"field","domain":["example.com"],"outboundTag":"direct"}]}`),
+		RouterConfig:    json_util.RawMessage(`{"domainStrategy":"AsIs","rules":[{"type":"field","domain":["example.com"],"outboundTag":"direct"}]}`),
 	}
 	injectClientEgress(cfg, []model.ClientRecord{
 		{Email: "alice@example.com", Enable: true, OutboundTag: "socks-us"},
@@ -41,7 +41,7 @@ func TestInjectClientEgressOutbound(t *testing.T) {
 func TestInjectClientEgressBalancer(t *testing.T) {
 	cfg := &xray.Config{
 		OutboundConfigs: json_util.RawMessage(`[]`),
-		RouterConfig: json_util.RawMessage(`{"balancers":[{"tag":"landing-pool","selector":["proxy-"]}],"rules":[]}`),
+		RouterConfig:    json_util.RawMessage(`{"balancers":[{"tag":"landing-pool","selector":["proxy-"]}],"rules":[]}`),
 	}
 	injectClientEgress(cfg, []model.ClientRecord{
 		{Email: "alice@example.com", Enable: true, OutboundTag: "landing-pool"},
