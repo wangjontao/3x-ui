@@ -12,3 +12,10 @@ Status: **LOCKED**
 The stable branch must not merge/rebase upstream main. Panel/core self-update is disabled. New upstream versions must be tested and released from a separate branch.
 
 Compatibility alias: `juliang-ui-v1` is pinned to the same stable commit so existing raw installer URLs do not follow the new frontend branch. The preserved development line is `juliang-next`.
+
+
+### R2.1
+
+Release tag: `juliang-v2.9.3-r2.1`.
+
+Fixes per-client landing outbound persistence after editing/reopening VLESS, Trojan, VMess, Shadowsocks, and Hysteria2 clients.
