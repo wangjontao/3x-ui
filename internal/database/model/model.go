@@ -896,6 +896,7 @@ type Client struct {
 	ForwardedPorts      string           `json:"forwardedPorts,omitempty"` // AmneziaWG per-client port-forwarding spec, e.g. "80,443,8000-8100"
 	Secret              string           `json:"secret,omitempty" example:"ee1234567890abcdef1234567890abcd7777772e636c6f7564666c6172652e636f6d"`
 	AdTag               string           `json:"adTag,omitempty" example:"0123456789abcdef0123456789abcdef"`
+	OutboundTag          string           `json:"outboundTag,omitempty" form:"outboundTag"` // Per-client Xray egress target; empty = normal/direct routing
 	Email               string           `json:"email"`                            // Client email identifier
 	LimitIP             int              `json:"limitIp"`                          // IP limit for this client
 	TotalGB             int64            `json:"totalGB" form:"totalGB"`           // Total traffic limit in GB
@@ -934,6 +935,7 @@ type ClientRecord struct {
 	ForwardedPorts  string `json:"forwardedPorts" gorm:"column:wg_forwarded_ports"`
 	Secret          string `json:"secret" gorm:"column:secret"`
 	AdTag           string `json:"adTag" gorm:"column:ad_tag;default:''"`
+	OutboundTag      string `json:"outboundTag" gorm:"column:outbound_tag;default:''"`
 	LimitIP         int    `json:"limitIp" gorm:"column:limit_ip"`
 	LimitHwid       int    `json:"limitHwid" gorm:"column:limit_hwid;default:0"`
 	TotalGB         int64  `json:"totalGB" gorm:"column:total_gb"`
@@ -1172,6 +1174,7 @@ func (c *Client) ToRecord() *ClientRecord {
 		ForwardedPorts: c.ForwardedPorts,
 		Secret:         c.Secret,
 		AdTag:          c.AdTag,
+		OutboundTag:    c.OutboundTag,
 	}
 	if c.Reverse != nil {
 		if b, err := json.Marshal(c.Reverse); err == nil {
@@ -1231,6 +1234,7 @@ func (r *ClientRecord) ToClient() *Client {
 		ForwardedPorts: r.ForwardedPorts,
 		Secret:         r.Secret,
 		AdTag:          r.AdTag,
+		OutboundTag:    r.OutboundTag,
 	}
 	if r.Reverse != "" {
 		var rev ClientReverse
