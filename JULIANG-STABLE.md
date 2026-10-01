@@ -35,3 +35,10 @@ Release tag: `juliang-v2.9.3-r2.3`.
 - New-client emails are generated uniquely across all inbounds.
 - Full Chinese `x-ui.sh` is restored.
 - Installer/management helper raw downloads are pinned to the immutable R2.3 tag instead of the mutable stable branch, avoiding stale CDN branch content.
+
+
+### R2.4
+
+Release tag: `juliang-v2.9.3-r2.4`.
+
+When adding a client, manually-entered duplicate emails are automatically suffixed (`test1` → `test1-2`, `test1-3`, ...). The email refresh button also generates a globally unique value.
