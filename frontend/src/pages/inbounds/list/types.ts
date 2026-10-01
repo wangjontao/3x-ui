@@ -62,6 +62,9 @@ export interface InboundSpeedEntry {
 
 export type RowAction =
   | 'edit'
+  | 'addClient'
+  | 'bulkCreateClients'
+  | 'resetClientsTraffic'
   | 'showInfo'
   | 'qrcode'
   | 'export'

@@ -168,6 +168,9 @@ export interface UseClientsOptions {
   // list whose result they never read, which on a large panel means a full
   // summary aggregate every 5 seconds for nothing.
   list?: boolean;
+  // Lightweight callers may need inbound choices for client creation without
+  // starting the paged clients list / online polling.
+  inbounds?: boolean;
 }
 
 export function useClients(options: UseClientsOptions = {}) {
@@ -223,7 +226,7 @@ export function useClients(options: UseClientsOptions = {}) {
   const inboundOptionsQuery = useQuery({
     queryKey: keys.inbounds.options(),
     queryFn: fetchInboundOptions,
-    enabled: withList,
+    enabled: withList || options.inbounds === true,
     staleTime: Infinity,
   });
 

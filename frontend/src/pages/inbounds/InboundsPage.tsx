@@ -47,6 +47,7 @@ import type { TextModalTab } from '@/components/feedback/TextModal';
 const PromptModal = lazy(() => import('@/components/feedback/PromptModal'));
 
 import { useInbounds } from './useInbounds';
+import { useClients } from '@/hooks/useClients';
 import { InboundList } from './list';
 import { LazyMount } from '@/components/utility';
 const InboundFormModal = lazy(() => import('./form/InboundFormModal'));
@@ -57,9 +58,14 @@ const AttachClientsModal = lazy(() => import('./clients/AttachClientsModal'));
 const AttachExistingClientsModal = lazy(() => import('./clients/AttachExistingClientsModal'));
 const DetachClientsModal = lazy(() => import('./clients/DetachClientsModal'));
 const AddClientsToGroupModal = lazy(() => import('./clients/AddClientsToGroupModal'));
+const ClientFormModal = lazy(() => import('../clients/ClientFormModal'));
+const ClientBulkAddModal = lazy(() => import('../clients/ClientBulkAddModal'));
 
 type RowAction =
   | 'edit'
+  | 'addClient'
+  | 'bulkCreateClients'
+  | 'resetClientsTraffic'
   | 'showInfo'
   | 'qrcode'
   | 'export'
@@ -185,6 +191,20 @@ export default function InboundsPage() {
 
   const [cloneOpen, setCloneOpen] = useState(false);
   const [cloneSource, setCloneSource] = useState<DBInbound | null>(null);
+
+  const [clientFormOpen, setClientFormOpen] = useState(false);
+  const [clientFormInboundIds, setClientFormInboundIds] = useState<number[]>([]);
+  const [clientBulkOpen, setClientBulkOpen] = useState(false);
+  const [clientBulkInboundIds, setClientBulkInboundIds] = useState<number[]>([]);
+
+  const {
+    inbounds: clientInboundOptions,
+    create: createClient,
+    setExternalLinks: setClientExternalLinks,
+  } = useClients({
+    list: false,
+    inbounds: clientFormOpen || clientBulkOpen,
+  });
 
   const [textOpen, setTextOpen] = useState(false);
   const [textTitle, setTextTitle] = useState('');
@@ -666,6 +686,7 @@ export default function InboundsPage() {
       const hydratingKeys: RowAction[] = [
         'edit',
         'showInfo',
+        'resetClientsTraffic',
         'qrcode',
         'export',
         'subs',
@@ -683,6 +704,38 @@ export default function InboundsPage() {
         case 'edit':
           openEdit(target);
           break;
+        case 'addClient':
+          setClientFormInboundIds([target.id]);
+          setClientFormOpen(true);
+          break;
+        case 'bulkCreateClients':
+          setClientBulkInboundIds([target.id]);
+          setClientBulkOpen(true);
+          break;
+        case 'resetClientsTraffic': {
+          const settings = coerceInboundJsonField(target.settings) as {
+            clients?: Array<{ email?: string }>;
+          };
+          const emails = (settings.clients || [])
+            .map((client) => (client.email || '').trim())
+            .filter(Boolean);
+          if (emails.length === 0) break;
+          modal.confirm({
+            title: t('pages.inbounds.resetClientsTraffic'),
+            content: t('pages.inbounds.resetClientsTrafficConfirm', { count: emails.length }),
+            okText: t('reset'),
+            cancelText: t('cancel'),
+            onOk: async () => {
+              const msg = await HttpUtil.post(
+                '/panel/api/clients/bulkResetTraffic',
+                { emails },
+                { headers: { 'Content-Type': 'application/json' } },
+              );
+              if (msg?.success) await refresh();
+            },
+          });
+          break;
+        }
         case 'showInfo':
           setInfoDbInbound(checkFallback(target));
           setInfoClientIndex(findClientIndex(target, null));
@@ -936,6 +989,38 @@ export default function InboundsPage() {
             availableNodesFetched={nodesFetched}
           />
         </LazyMount>
+        <LazyMount when={clientFormOpen}>
+          <ClientFormModal
+            open={clientFormOpen}
+            mode="add"
+            client={null}
+            inbounds={clientInboundOptions}
+            defaultInboundIds={clientFormInboundIds}
+            tgBotEnable={tgBotEnable}
+            save={async (payload, meta) => {
+              if (meta.isEdit) return null;
+              const msg = await createClient(payload);
+              if (!msg?.success) return msg;
+              if (meta.email && meta.externalLinks.length > 0) {
+                const linksMsg = await setClientExternalLinks(meta.email, meta.externalLinks);
+                if (!linksMsg?.success) return linksMsg;
+              }
+              await refresh();
+              return msg;
+            }}
+            onOpenChange={setClientFormOpen}
+          />
+        </LazyMount>
+        <LazyMount when={clientBulkOpen}>
+          <ClientBulkAddModal
+            open={clientBulkOpen}
+            inbounds={clientInboundOptions}
+            defaultInboundIds={clientBulkInboundIds}
+            onOpenChange={setClientBulkOpen}
+            onSaved={refresh}
+          />
+        </LazyMount>
+
         <LazyMount when={infoOpen}>
           <InboundInfoModal
             open={infoOpen}

@@ -116,6 +116,7 @@ interface ClientFormModalProps {
   inbounds: InboundOption[];
   attachedExternalLinks?: ExternalLink[];
   attachedIds?: number[];
+  defaultInboundIds?: number[];
   tunnelAllowedIPs?: Record<number, string>;
   tgBotEnable?: boolean;
   groups?: string[];
@@ -249,6 +250,7 @@ export default function ClientFormModal({
   inbounds,
   attachedExternalLinks = [],
   attachedIds = [],
+  defaultInboundIds = [],
   tunnelAllowedIPs = {},
   tgBotEnable = false,
   groups = [],
@@ -416,6 +418,7 @@ export default function ClientFormModal({
         subId: RandomUtil.randomLowerAndNum(16),
         password: RandomUtil.randomLowerAndNum(16),
         auth: RandomUtil.randomLowerAndNum(16),
+        inboundIds: [...defaultInboundIds],
         wgPrivateKey: wgKeypair.privateKey,
         wgPublicKey: wgKeypair.publicKey,
       });
