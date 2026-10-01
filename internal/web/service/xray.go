@@ -14,6 +14,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgnet"
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
+	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/json_util"
@@ -399,6 +400,18 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		mergeSubscriptionOutbounds(xrayConfig, prepend, appendList)
 	}
 
+	// JuLiang per-client landing routes are generated only after all manual and
+	// subscription outbounds are present, so a client may select either kind.
+	// Internal infrastructure rules injected below can still stay above these
+	// user rules when they must preserve panel/node/AmneziaWG plumbing.
+	var egressClients []model.ClientRecord
+	if err := database.GetDB().
+		Where("enable = ? AND TRIM(COALESCE(outbound_tag, '')) <> ''", true).
+		Find(&egressClients).Error; err != nil {
+		return nil, err
+	}
+	injectClientEgress(xrayConfig, egressClients)
+
 	// Route opted-in local mtproto inbounds through the core's router. Each one
 	// gets a loopback SOCKS bridge — tagged with the inbound's own tag so it is
 	// matchable in routing rules — that its mtg sidecar dials Telegram through.
@@ -526,6 +539,58 @@ func injectPanelEgress(cfg *xray.Config, outboundTag string) {
 		Settings: json_util.RawMessage(`{"auth":"noauth","udp":false}`),
 		Tag:      PanelEgressInboundTag,
 	})
+}
+
+// injectClientEgress prepends one user-scoped routing rule for every enabled
+// client that selected a landing target. The target may be a concrete outbound
+// or a routing balancer. Missing targets are skipped instead of producing an
+// Xray config that cannot start; clearing OutboundTag removes the generated
+// rule on the next config reconciliation.
+func injectClientEgress(cfg *xray.Config, clients []model.ClientRecord) {
+	if len(clients) == 0 {
+		return
+	}
+
+	routing := map[string]any{}
+	if len(cfg.RouterConfig) > 0 {
+		if err := json.Unmarshal(cfg.RouterConfig, &routing); err != nil {
+			logger.Warning("client egress: routing section is unparsable, skipping injection:", err)
+			return
+		}
+	}
+	rules, _ := routing["rules"].([]any)
+	newRules := make([]any, 0, len(clients))
+	for _, client := range clients {
+		email := strings.TrimSpace(client.Email)
+		tag := strings.TrimSpace(client.OutboundTag)
+		if !client.Enable || email == "" || tag == "" {
+			continue
+		}
+		if !routingTargetExists(routing, cfg.OutboundConfigs, tag) {
+			logger.Warning("client egress: target tag [", tag, "] not found, skipping client [", email, "]")
+			continue
+		}
+		rule := map[string]any{
+			"type": "field",
+			"user": []any{email},
+		}
+		if routingTagIsBalancer(routing, tag) {
+			rule["balancerTag"] = tag
+		} else {
+			rule["outboundTag"] = tag
+		}
+		newRules = append(newRules, rule)
+	}
+	if len(newRules) == 0 {
+		return
+	}
+	routing["rules"] = append(newRules, rules...)
+	newRouting, err := json.Marshal(routing)
+	if err != nil {
+		logger.Warning("client egress: failed to rebuild routing section, skipping injection:", err)
+		return
+	}
+	cfg.RouterConfig = json_util.RawMessage(newRouting)
 }
 
 func outboundTagExists(outbounds json_util.RawMessage, tag string) bool {
