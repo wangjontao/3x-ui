@@ -19,3 +19,10 @@ Compatibility alias: `juliang-ui-v1` is pinned to the same stable commit so exis
 Release tag: `juliang-v2.9.3-r2.1`.
 
 Fixes per-client landing outbound persistence after editing/reopening VLESS, Trojan, VMess, Shadowsocks, and Hysteria2 clients.
+
+
+### R2.2
+
+Release tag: `juliang-v2.9.3-r2.2`.
+
+Fixes actual landing-route application by forcing Xray routing reload for clients using `outboundTag`, in addition to the R2.1 UI persistence fix.

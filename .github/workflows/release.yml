@@ -29,7 +29,7 @@ concurrency:
 env:
   JULIANG_PANEL_VERSION: v2.9.3
   JULIANG_XRAY_VERSION: v26.4.25
-  JULIANG_RELEASE_TAG: juliang-v2.9.3-r2.1
+  JULIANG_RELEASE_TAG: juliang-v2.9.3-r2.2
 
 jobs:
   build:
@@ -154,4 +154,4 @@ jobs:
           fi
           git tag "${JULIANG_RELEASE_TAG}" "$GITHUB_SHA"
           git push origin "refs/tags/${JULIANG_RELEASE_TAG}"
-          gh release create "${JULIANG_RELEASE_TAG}"             --target "$GITHUB_SHA"             --title "JuLiang-UI Stable R2.1 · v2.9.3 / Xray v26.4.25"             --notes "JuLiang stable R2.1. Locked to 3x-ui v2.9.3 and Xray-core v26.4.25. Fixes persistence of per-client landing outbound selection and keeps the R2 SK5 bulk import, managed routing, one-click inbound presets, and native BBR + FQ installer setup. This stable release does not follow upstream main."             release-artifacts/*.tar.gz release-artifacts/*.sha256
+          gh release create "${JULIANG_RELEASE_TAG}"             --target "$GITHUB_SHA"             --title "JuLiang-UI Stable R2.2 · v2.9.3 / Xray v26.4.25"             --notes "JuLiang stable R2.2. Locked to 3x-ui v2.9.3 and Xray-core v26.4.25. Fixes per-client landing persistence and forces immediate Xray routing reload whenever a bound landing client is added, edited, enabled/disabled, or deleted. Keeps SK5 bulk import, one-click inbound presets, and native BBR + FQ. This stable release does not follow upstream main."             release-artifacts/*.tar.gz release-artifacts/*.sha256
