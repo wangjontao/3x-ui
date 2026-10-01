@@ -2396,6 +2396,7 @@ Inbound.ClientBase = class extends XrayCommonClass {
         reset = 0,
         created_at = undefined,
         updated_at = undefined,
+        outboundTag = '',
     ) {
         super();
         this.email = email;
@@ -2409,6 +2410,7 @@ Inbound.ClientBase = class extends XrayCommonClass {
         this.reset = reset;
         this.created_at = created_at;
         this.updated_at = updated_at;
+        this.outboundTag = outboundTag || '';
     }
 
     static commonArgsFromJson(json = {}) {
@@ -2424,6 +2426,7 @@ Inbound.ClientBase = class extends XrayCommonClass {
             json.reset,
             json.created_at,
             json.updated_at,
+            json.outboundTag || '',
         ];
     }
 
@@ -2440,6 +2443,7 @@ Inbound.ClientBase = class extends XrayCommonClass {
             reset: this.reset,
             created_at: this.created_at,
             updated_at: this.updated_at,
+            outboundTag: this.outboundTag || '',
         };
     }
 

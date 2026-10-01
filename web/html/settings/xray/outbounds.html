@@ -7,6 +7,9 @@
                     <span v-if="!isMobile">{{ i18n
                         "pages.xray.outbound.addOutbound" }}</span>
                 </a-button>
+                <a-button type="primary" icon="import" @click="openSk5Import">
+                    <span v-if="!isMobile">SK5 批量导入</span>
+                </a-button>
                 <a-button type="primary" icon="cloud"
                     @click="showWarp()">WARP</a-button>
                 <a-button type="primary" icon="api"
@@ -30,6 +33,20 @@
             </a-button-group>
         </a-col>
     </a-row>
+    <a-modal
+        v-model="sk5ImportVisible"
+        title="SK5 批量导入"
+        ok-text="导入并生成路由"
+        cancel-text='{{ i18n "cancel" }}'
+        :class="themeSwitcher.currentTheme"
+        @ok="importSk5"
+    >
+        <a-alert type="info" show-icon
+            message="支持 socks5://user:pass@host:port、host|port|user|pass|备注、host:port:user:pass:备注；每行一个。导入后会自动生成客户端可选择的落地路由。"
+            :style="{ marginBottom: '12px' }"></a-alert>
+        <a-textarea v-model="sk5ImportText" :auto-size="{ minRows: 10, maxRows: 18 }"
+            placeholder="每行一个 SOCKS5"></a-textarea>
+    </a-modal>
     <a-table :columns="outboundColumns" bordered :row-key="r => r.key"
         :data-source="outboundData"
         :scroll="isMobile ? {} : { x: 800 }" :pagination="false"

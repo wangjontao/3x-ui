@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/mhsanaei/3x-ui/v2/logger"
@@ -109,6 +110,7 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	clientEgress := make(map[string][]string)
 	for _, inbound := range inbounds {
 		if !inbound.Enable {
 			continue
@@ -144,6 +146,16 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 				// check manual disabled flag
 				if manualEnable, ok := c["enable"].(bool); ok && !manualEnable {
 					continue
+				}
+
+				// JuLiang: outboundTag is panel-only metadata. Remember it for
+				// runtime user routing, then let the normal cleanup strip it
+				// before the client object reaches Xray.
+				if outboundTag, ok := c["outboundTag"].(string); ok {
+					outboundTag = strings.TrimSpace(outboundTag)
+					if outboundTag != "" && strings.TrimSpace(email) != "" {
+						clientEgress[outboundTag] = append(clientEgress[outboundTag], email)
+					}
 				}
 
 				// clear client config for additional parameters
@@ -195,7 +207,118 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		inboundConfig := inbound.GenXrayInboundConfig()
 		xrayConfig.InboundConfigs = append(xrayConfig.InboundConfigs, *inboundConfig)
 	}
+	injectClientEgress(xrayConfig, clientEgress)
 	return xrayConfig, nil
+}
+
+const juliangSK5RulePrefix = "juliang-sk5:"
+
+func injectClientEgress(cfg *xray.Config, usersByTag map[string][]string) {
+	routing := map[string]any{}
+	if len(cfg.RouterConfig) > 0 {
+		if err := json.Unmarshal(cfg.RouterConfig, &routing); err != nil {
+			logger.Warning("JuLiang client egress: invalid routing config:", err)
+			return
+		}
+	}
+	rules, _ := routing["rules"].([]any)
+
+	validOutbounds := map[string]bool{}
+	var outbounds []map[string]any
+	if err := json.Unmarshal(cfg.OutboundConfigs, &outbounds); err == nil {
+		for _, outbound := range outbounds {
+			if tag, ok := outbound["tag"].(string); ok && strings.TrimSpace(tag) != "" {
+				validOutbounds[strings.TrimSpace(tag)] = true
+			}
+		}
+	}
+	validBalancers := map[string]bool{}
+	if balancers, ok := routing["balancers"].([]any); ok {
+		for _, raw := range balancers {
+			if balancer, ok := raw.(map[string]any); ok {
+				if tag, ok := balancer["tag"].(string); ok && strings.TrimSpace(tag) != "" {
+					validBalancers[strings.TrimSpace(tag)] = true
+				}
+			}
+		}
+	}
+	targetExists := func(tag string) bool { return validOutbounds[tag] || validBalancers[tag] }
+
+	// Deduplicate enabled client emails per target.
+	for tag, users := range usersByTag {
+		seen := map[string]bool{}
+		clean := make([]string, 0, len(users))
+		for _, user := range users {
+			user = strings.TrimSpace(user)
+			if user != "" && !seen[user] {
+				seen[user] = true
+				clean = append(clean, user)
+			}
+		}
+		usersByTag[tag] = clean
+	}
+
+	managedUsed := map[string]bool{}
+	cleanedRules := make([]any, 0, len(rules))
+	for _, raw := range rules {
+		rule, ok := raw.(map[string]any)
+		if !ok {
+			cleanedRules = append(cleanedRules, raw)
+			continue
+		}
+		ruleTag, _ := rule["ruleTag"].(string)
+		if !strings.HasPrefix(ruleTag, juliangSK5RulePrefix) {
+			cleanedRules = append(cleanedRules, raw)
+			continue
+		}
+		target := strings.TrimSpace(strings.TrimPrefix(ruleTag, juliangSK5RulePrefix))
+		if !targetExists(target) {
+			continue
+		}
+
+		runtimeRule := make(map[string]any, len(rule))
+		for key, value := range rule {
+			if key == "ruleTag" || key == "comment" || key == "enabled" {
+				continue
+			}
+			runtimeRule[key] = value
+		}
+		delete(runtimeRule, "outboundTag")
+		delete(runtimeRule, "balancerTag")
+		if users := usersByTag[target]; len(users) > 0 {
+			runtimeRule["user"] = users
+			managedUsed[target] = true
+		} else {
+			runtimeRule["user"] = []string{"__juliang_tk_unassigned__:" + target}
+		}
+		if validBalancers[target] {
+			runtimeRule["balancerTag"] = target
+		} else {
+			runtimeRule["outboundTag"] = target
+		}
+		cleanedRules = append(cleanedRules, runtimeRule)
+	}
+
+	generated := make([]any, 0)
+	for tag, users := range usersByTag {
+		if managedUsed[tag] || len(users) == 0 || !targetExists(tag) {
+			continue
+		}
+		rule := map[string]any{"type": "field", "user": users}
+		if validBalancers[tag] {
+			rule["balancerTag"] = tag
+		} else {
+			rule["outboundTag"] = tag
+		}
+		generated = append(generated, rule)
+	}
+	routing["rules"] = append(generated, cleanedRules...)
+	newRouting, err := json.Marshal(routing)
+	if err != nil {
+		logger.Warning("JuLiang client egress: rebuild routing failed:", err)
+		return
+	}
+	cfg.RouterConfig = newRouting
 }
 
 // GetXrayTraffic fetches the current traffic statistics from the running Xray process.

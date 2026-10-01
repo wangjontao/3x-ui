@@ -143,8 +143,9 @@ type Client struct {
 	Enable     bool   `json:"enable" form:"enable"`         // Whether the client is enabled
 	TgID       int64  `json:"tgId" form:"tgId"`             // Telegram user ID for notifications
 	SubID      string `json:"subId" form:"subId"`           // Subscription identifier
-	Comment    string `json:"comment" form:"comment"`       // Client comment
-	Reset      int    `json:"reset" form:"reset"`           // Reset period in days
+	Comment     string `json:"comment" form:"comment"`                         // Client comment
+	OutboundTag string `json:"outboundTag,omitempty" form:"outboundTag"`        // JuLiang per-client landing outbound
+	Reset       int    `json:"reset" form:"reset"`                             // Reset period in days
 	CreatedAt  int64  `json:"created_at,omitempty"`         // Creation timestamp
 	UpdatedAt  int64  `json:"updated_at,omitempty"`         // Last update timestamp
 }

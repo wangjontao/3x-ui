@@ -260,6 +260,8 @@
       refreshing: false,
       restartResult: '',
       showAlert: false,
+      sk5ImportVisible: false,
+      sk5ImportText: '',
       customGeoAliasLabelSuffix: '{{ i18n "pages.index.customGeoAliasLabelSuffix" }}',
       advSettings: 'xraySetting',
       obsSettings: '',
@@ -586,6 +588,92 @@
             return null;
         }
         return serverObj ? serverObj.map(obj => obj.address + ':' + obj.port) : null;
+      },
+      openSk5Import() {
+        this.sk5ImportText = '';
+        this.sk5ImportVisible = true;
+      },
+      parseSk5Line(raw, index) {
+        const line = (raw || '').trim();
+        if (!line || line.startsWith('#')) return null;
+        let address = '', port = 0, user = '', pass = '', remark = '';
+        try {
+          if (/^socks5?:\/\//i.test(line)) {
+            const url = new URL(line.replace(/^socks:\/\//i, 'socks5://'));
+            address = url.hostname;
+            port = Number(url.port || 1080);
+            user = decodeURIComponent(url.username || '');
+            pass = decodeURIComponent(url.password || '');
+            remark = decodeURIComponent((url.hash || '').replace(/^#/, ''));
+          } else if (line.includes('|')) {
+            const parts = line.split('|');
+            address = (parts[0] || '').trim();
+            port = Number((parts[1] || '').trim());
+            user = (parts[2] || '').trim();
+            pass = (parts[3] || '').trim();
+            remark = parts.slice(4).join('|').trim();
+          } else {
+            const m = /^([^:\s]+):(\d+):([^:]*):([^:]*)(?::(.*))?$/.exec(line);
+            if (!m) return null;
+            address = m[1]; port = Number(m[2]); user = m[3] || ''; pass = m[4] || ''; remark = m[5] || '';
+          }
+        } catch (_) { return null; }
+        if (!address || !Number.isInteger(port) || port < 1 || port > 65535) return null;
+        if ((user && !pass) || (!user && pass)) return null;
+        return { address, port, user, pass, remark, index };
+      },
+      importSk5() {
+        const cfg = this.templateSettings;
+        if (!cfg) return;
+        if (!Array.isArray(cfg.outbounds)) cfg.outbounds = [];
+        if (!cfg.routing) cfg.routing = {};
+        if (!Array.isArray(cfg.routing.rules)) cfg.routing.rules = [];
+
+        const used = new Set(cfg.outbounds.map(o => (o && o.tag) || '').filter(Boolean));
+        let imported = 0, skipped = 0;
+        const rows = (this.sk5ImportText || '').split(/\r?\n/);
+        rows.forEach((raw, idx) => {
+          const item = this.parseSk5Line(raw, idx + 1);
+          if (!item) {
+            if ((raw || '').trim() && !(raw || '').trim().startsWith('#')) skipped++;
+            return;
+          }
+          const cleanRemark = (item.remark || '').trim();
+          const base = cleanRemark || ('SK5-' + String(idx + 1).padStart(3, '0') + '-' + item.address);
+          let tag = base, n = 2;
+          while (used.has(tag)) tag = base + '-' + (n++);
+          used.add(tag);
+
+          cfg.outbounds.push({
+            tag: tag,
+            protocol: 'socks',
+            settings: {
+              servers: [{
+                address: item.address,
+                port: item.port,
+                users: item.user && item.pass ? [{ user: item.user, pass: item.pass }] : []
+              }]
+            }
+          });
+          cfg.routing.rules.push({
+            type: 'field',
+            user: ['__juliang_tk_unassigned__:' + tag],
+            outboundTag: tag,
+            ruleTag: 'juliang-sk5:' + tag,
+            comment: 'JuLiang-TK SK5'
+          });
+          imported++;
+        });
+
+        this.templateSettings = cfg;
+        this.sk5ImportVisible = false;
+        this.sk5ImportText = '';
+        if (imported > 0) {
+          this.$message.success('已导入 ' + imported + ' 个 SK5，并生成客户端落地路由；点击“保存设置”生效。');
+        } else {
+          this.$message.error('没有识别到有效的 SK5 数据');
+        }
+        if (skipped > 0) this.$message.warning('跳过无效行：' + skipped);
       },
       addOutbound() {
         outModal.show({

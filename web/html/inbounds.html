@@ -1126,10 +1126,29 @@
       showAlert: false,
       ipLimitEnable: false,
       pageSize: 0,
+      outboundTags: [],
     },
     methods: {
       loading(spinning = true) {
         this.loadingStates.spinning = spinning;
+      },
+      async getOutboundTags() {
+        try {
+          const msg = await HttpUtil.post('/panel/xray/');
+          if (!msg.success || !msg.obj) return;
+          const payload = JSON.parse(msg.obj);
+          const cfg = payload.xraySetting || {};
+          const tags = new Set();
+          (cfg.outbounds || []).forEach(o => {
+            if (o && o.tag && o.protocol !== 'blackhole') tags.add(o.tag);
+          });
+          (((cfg.routing || {}).balancers) || []).forEach(b => {
+            if (b && b.tag) tags.add(b.tag);
+          });
+          this.outboundTags = Array.from(tags);
+        } catch (e) {
+          console.warn('JuLiang: failed to load outbound tags', e);
+        }
       },
       async getDBInbounds() {
         this.refreshing = true;
@@ -2029,6 +2048,7 @@
       }
       this.loading();
       this.getDefaultSettings();
+      this.getOutboundTags();
       
       // Initial data fetch
       this.getDBInbounds().then(() => {
