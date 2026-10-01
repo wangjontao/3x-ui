@@ -51,6 +51,7 @@ import { useClients } from '@/hooks/useClients';
 import { InboundList } from './list';
 import { LazyMount } from '@/components/utility';
 const InboundFormModal = lazy(() => import('./form/InboundFormModal'));
+const OneClickInboundModal = lazy(() => import('./OneClickInboundModal'));
 const CloneInboundModal = lazy(() => import('./CloneInboundModal'));
 const InboundInfoModal = lazy(() => import('./info/InboundInfoModal'));
 const QrCodeModal = lazy(() => import('./qr/QrCodeModal'));
@@ -170,6 +171,7 @@ export default function InboundsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [formDbInbound, setFormDbInbound] = useState<DBInbound | null>(null);
+  const [oneClickOpen, setOneClickOpen] = useState(false);
 
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoDbInbound, setInfoDbInbound] = useState<DBInbound | null>(null);
@@ -956,6 +958,7 @@ export default function InboundsPage() {
                       hasActiveNode={showNodeInfo}
                       hosts={hosts}
                       onAddInbound={onAddInbound}
+                      onOneClick={() => setOneClickOpen(true)}
                       onGeneralAction={onGeneralAction}
                       onRowAction={({ key, dbInbound }) =>
                         onRowAction({ key, dbInbound: dbInbound as unknown as DBInbound })
@@ -977,6 +980,14 @@ export default function InboundsPage() {
           </Layout.Content>
         </Layout>
 
+        <LazyMount when={oneClickOpen}>
+          <OneClickInboundModal
+            open={oneClickOpen}
+            usedPorts={dbInbounds.filter((ib) => ib.nodeId == null).map((ib) => ib.port)}
+            onClose={() => setOneClickOpen(false)}
+            onCreated={refresh}
+          />
+        </LazyMount>
         <LazyMount when={formOpen}>
           <InboundFormModal
             open={formOpen}

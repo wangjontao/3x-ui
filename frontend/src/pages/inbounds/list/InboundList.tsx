@@ -25,6 +25,7 @@ import {
   InfoCircleOutlined,
   DeleteOutlined,
   SearchOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 
 import { HttpUtil } from '@/utils';
@@ -62,6 +63,7 @@ export default function InboundList({
   hasActiveNode,
   hosts,
   onAddInbound,
+  onOneClick,
   onGeneralAction,
   onRowAction,
   onClientAction,
@@ -242,6 +244,14 @@ export default function InboundList({
               {!isMobile && t('pages.inbounds.generalActions')}
             </Button>
           </Dropdown>
+          <Button
+            type="primary"
+            icon={<ThunderboltOutlined />}
+            onClick={onOneClick}
+            aria-label={t('pages.inbounds.oneClick.title')}
+          >
+            {!isMobile && t('pages.inbounds.oneClick.title')}
+          </Button>
           {showNodeFilter && (
             <Select
               value={nodeFilter}

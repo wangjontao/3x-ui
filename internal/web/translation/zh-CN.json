@@ -324,6 +324,10 @@
       "resetTraffic": "重置流量",
       "addInbound": "添加入站",
       "generalActions": "通用操作",
+      "oneClick": {
+        "title": "一键配置",
+        "prompt": "选择常用协议组合快速创建入站"
+      },
       "modifyInbound": "修改入站",
       "deleteConfirmTitle": "删除入站 \"{remark}\"？",
       "deleteConfirmContent": "将删除此入站及其所有客户端。该操作不可撤销。",

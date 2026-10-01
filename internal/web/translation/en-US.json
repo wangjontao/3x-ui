@@ -324,6 +324,10 @@
       "resetTraffic": "Reset Traffic",
       "addInbound": "Add Inbound",
       "generalActions": "General Actions",
+      "oneClick": {
+        "title": "One-click",
+        "prompt": "Quickly create an inbound from a common protocol preset"
+      },
       "modifyInbound": "Modify Inbound",
       "deleteConfirmTitle": "Delete inbound \"{remark}\"?",
       "deleteConfirmContent": "This removes the inbound and all its clients. This cannot be undone.",

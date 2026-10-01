@@ -94,6 +94,7 @@ export interface InboundListProps {
   hasActiveNode: boolean;
   hosts: HostRecord[];
   onAddInbound: () => void;
+  onOneClick: () => void;
   onGeneralAction: (key: GeneralAction) => void;
   onRowAction: (action: { key: RowAction; dbInbound: DBInboundRecord }) => void;
   onClientAction: (action: {
