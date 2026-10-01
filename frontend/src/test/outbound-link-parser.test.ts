@@ -489,7 +489,6 @@ describe('parseSocksLink', () => {
   });
 });
 
-
 describe('parseSocksBatch', () => {
   it('imports mixed socks5 URLs and pipe rows in one paste', () => {
     const parsed = parseSocksBatch(
