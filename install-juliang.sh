@@ -1,5 +1,6 @@
 #!/bin/bash
-# JuLiang-UI 轻量安装器：基于 V2RaySSR/3x-ui-cn-installer 的固定 Release 安装方式改造。\n# VPS 只下载预编译包，不安装 Node.js/Go，也不在本机编译。
+# JuLiang-UI 轻量安装器：基于 V2RaySSR/3x-ui-cn-installer 的固定 Release 安装方式改造。
+# VPS 只下载预编译包，不安装 Node.js/Go，也不在本机编译。
 
 
 red='\033[0;31m'
@@ -906,6 +907,7 @@ install_x-ui() {
     # 更新 x-ui 命令行脚本并设置权限
     mv -f /usr/bin/x-ui-temp /usr/bin/x-ui
     chmod +x /usr/bin/x-ui
+    ln -sf /usr/bin/x-ui /usr/bin/juliang-ui
     mkdir -p /var/log/x-ui
     config_after_install
 
