@@ -60,6 +60,27 @@ function randomPath(): string {
   return `/${RandomUtil.randomLowerAndNum(10)}`;
 }
 
+function oneClickUuid(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  const hex = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
+  return hex.replace(/[xy]/g, (ch) => {
+    const r = Math.floor(Math.random() * 16);
+    const v = ch === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function oneClickClient(flow = '') {
+  return createDefaultVlessClient({
+    id: oneClickUuid(),
+    email: RandomUtil.randomLowerAndNum(10),
+    subId: RandomUtil.randomLowerAndNum(16),
+    flow: flow as Parameters<typeof createDefaultVlessClient>[0]['flow'],
+  });
+}
+
 function realitySettings(material: OneClickRealityMaterial) {
   const serverNames = material.serverNames.filter(Boolean);
   if (!material.target || !material.privateKey || !material.publicKey || serverNames.length === 0) {
@@ -120,7 +141,7 @@ export function buildOneClickInboundPayload({
 
   if (preset === 'vless-reality-vision') {
     if (!reality) throw new Error('Reality material required');
-    settings.clients = [createDefaultVlessClient({ flow: 'xtls-rprx-vision' })];
+    settings.clients = [oneClickClient('xtls-rprx-vision')];
     streamSettings = {
       network: 'tcp',
       security: 'reality',
@@ -130,7 +151,7 @@ export function buildOneClickInboundPayload({
     remark = `JuLiang-Reality-Vision-${index}`;
   } else if (preset === 'vless-xhttp-reality') {
     if (!reality) throw new Error('Reality material required');
-    settings.clients = [createDefaultVlessClient()];
+    settings.clients = [oneClickClient()];
     streamSettings = {
       network: 'xhttp',
       security: 'reality',
@@ -140,7 +161,7 @@ export function buildOneClickInboundPayload({
     remark = `JuLiang-XHTTP-Reality-${index}`;
   } else {
     if (!tls) throw new Error('TLS material required');
-    settings.clients = [createDefaultVlessClient()];
+    settings.clients = [oneClickClient()];
     settings.decryption = tls.decryption || 'none';
     settings.encryption = tls.encryption || 'none';
     streamSettings = {
