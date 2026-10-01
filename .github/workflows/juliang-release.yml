@@ -64,9 +64,9 @@ jobs:
         working-directory: frontend
         run: npm run typecheck
 
-      - name: Test JuLiang SOCKS5 import
+      - name: Test JuLiang frontend features
         working-directory: frontend
-        run: npm test -- src/test/outbound-link-parser.test.ts
+        run: npm test -- src/test/outbound-link-parser.test.ts src/test/one-click-inbound.test.ts
 
       - name: Build frontend
         working-directory: frontend

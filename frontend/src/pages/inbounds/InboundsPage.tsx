@@ -801,6 +801,9 @@ export default function InboundsPage() {
       confirmResetTraffic,
       confirmDelAllClients,
       confirmClone,
+      modal,
+      refresh,
+      t,
       messageApi,
     ],
   );
