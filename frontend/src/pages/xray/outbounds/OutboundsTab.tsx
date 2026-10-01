@@ -325,7 +325,6 @@ export default function OutboundsTab({
     setImportOpen(false);
   }
 
-
   function importSk5(value: string) {
     const occupiedTags = new Set<string>();
     for (const outbound of templateSettings?.outbounds || []) {
