@@ -34,6 +34,7 @@ import { buildRowActionsMenu } from './RowActions';
 import { useInboundColumns } from './useInboundColumns';
 import { buildHostRemarksByInboundId, formatHostRemarksLabel } from './helpers';
 import InboundStatsModal from './InboundStatsModal';
+import InboundClientRows from './InboundClientRows';
 import type { DBInboundRecord, GeneralAction, InboundListProps, RowAction } from './types';
 import './InboundList.css';
 
@@ -63,6 +64,8 @@ export default function InboundList({
   onAddInbound,
   onGeneralAction,
   onRowAction,
+  onClientAction,
+  onClientEnable,
   onBulkDelete,
 }: InboundListProps) {
   const { t } = useTranslation();
@@ -195,6 +198,11 @@ export default function InboundList({
     items: [
       { key: 'import', icon: <ImportOutlined />, label: t('pages.inbounds.importInbound') },
       { key: 'export', icon: <ExportOutlined />, label: t('pages.inbounds.export') },
+      {
+        key: 'exportClients',
+        icon: <ExportOutlined />,
+        label: t('pages.inbounds.exportClientsConfig'),
+      },
       ...(subEnable
         ? [
             {
@@ -215,7 +223,6 @@ export default function InboundList({
 
   return (
     <Card
-      hoverable
       title={
         <Space>
           <Button
@@ -371,7 +378,19 @@ export default function InboundList({
               onChange: (keys: Key[]) => setSelectedRowKeys(keys as number[]),
             }}
             pagination={paginationFor(visibleInbounds)}
-            scroll={{ x: tableScrollX }}
+            expandable={{
+              expandedRowRender: (record) => (
+                <InboundClientRows
+                  record={record}
+                  rollup={clientCount[record.id]}
+                  onAction={onClientAction}
+                  onEnable={onClientEnable}
+                />
+              ),
+              rowExpandable: (record) => (clientCount[record.id]?.clients || 0) > 0,
+              columnWidth: 36,
+            }}
+            scroll={{ x: tableScrollX + 36 }}
             style={{ marginTop: 10 }}
             size="small"
             locale={{
