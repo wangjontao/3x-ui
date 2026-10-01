@@ -418,6 +418,7 @@ export interface Client {
   id?: string;
   keepAlive?: number | null;
   limitIp: number;
+  outboundTag?: string;
   password?: string;
   preSharedKey?: string;
   privateKey?: string;
@@ -470,6 +471,7 @@ export interface ClientRecord {
   keepAlive: number;
   limitHwid: number;
   limitIp: number;
+  outboundTag: string;
   password: string;
   preSharedKey: string;
   privateKey: string;
