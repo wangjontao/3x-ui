@@ -32,6 +32,7 @@
             if (clientModal.isEdit) {
                 ObjectUtil.execute(clientModal.confirm, clientModalApp.client, clientModal.dbInbound.id, clientModal.oldClientId);
             } else {
+                clientModal.ensureUniqueEmail(clientModalApp.client, true);
                 ObjectUtil.execute(clientModal.confirm, clientModalApp.client, clientModal.dbInbound.id);
             }
         },
@@ -78,21 +79,37 @@
             }
             return used;
         },
-        ensureUniqueEmail(client) {
+        ensureUniqueEmail(client, notify = false) {
             if (!client) return client;
             const used = this.getUsedEmails();
-            let email = String(client.email || '').trim();
-            let tries = 0;
-            while (!email || used.has(email.toLowerCase())) {
-                email = RandomUtil.randomLowerAndNum(8);
-                tries++;
-                if (tries > 64) {
-                    email = 'jl' + Date.now().toString(36) + RandomUtil.randomLowerAndNum(4);
-                    break;
+            const original = String(client.email || '').trim();
+            let email = original || RandomUtil.randomLowerAndNum(8);
+
+            if (used.has(email.toLowerCase())) {
+                const base = original || 'client';
+                let n = 2;
+                let candidate = base + '-' + n;
+                while (used.has(candidate.toLowerCase()) && n < 10000) {
+                    n++;
+                    candidate = base + '-' + n;
+                }
+                email = candidate;
+                if (notify && typeof app !== 'undefined' && app.$message) {
+                    app.$message.warning('客户端名称已存在，已自动改为：' + email);
                 }
             }
+
             client.email = email;
             return client;
+        },
+        regenerateUniqueEmail(client) {
+            if (!client) return;
+            const used = this.getUsedEmails();
+            let email = '';
+            do {
+                email = RandomUtil.randomLowerAndNum(9);
+            } while (used.has(email.toLowerCase()));
+            client.email = email;
         },
         addClient(inbound, clients) {
             let client = null;

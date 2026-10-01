@@ -18,7 +18,7 @@
         {{ i18n "pages.inbounds.email" }}
         <a-icon
           type="sync"
-          @click="client.email = RandomUtil.randomLowerAndNum(9)"
+          @click="clientModal.regenerateUniqueEmail(client)"
         ></a-icon>
       </a-tooltip>
     </template>
