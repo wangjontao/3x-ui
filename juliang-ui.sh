@@ -131,7 +131,7 @@ install() {
 }
 
 update() {
-    confirm "本项目固定为JuLiang-UI ${fixed_version}。此操作会重装 JuLiang-UI本，数据不会丢失。是否继续？" "y"
+    confirm "将从 ${fixed_version} 预编译通道更新 JuLiang-UI，现有数据不会丢失。是否继续？" "y"
     if [[ $? != 0 ]]; then
         LOGE "已取消"
         if [[ $# == 0 ]]; then
@@ -148,7 +148,7 @@ update() {
 
 update_menu() {
     echo -e "${yellow}正在更新菜单${plain}"
-    confirm "此功能会从本仓库 main 分支更新JuLiang-UI 中文菜单脚本。" "y"
+    confirm "此功能会从 juliang-ui-v1 分支更新 JuLiang-UI 中文菜单脚本。" "y"
     if [[ $? != 0 ]]; then
         LOGE "已取消"
         if [[ $# == 0 ]]; then
