@@ -546,6 +546,14 @@ func injectPanelEgress(cfg *xray.Config, outboundTag string) {
 // or a routing balancer. Missing targets are skipped instead of producing an
 // Xray config that cannot start; clearing OutboundTag removes the generated
 // rule on the next config reconciliation.
+const juliangSK5RulePrefix = "juliang-sk5:"
+
+// injectClientEgress binds each enabled client to its selected landing target.
+// JuLiang-TK bulk SK5 imports persist a visible routing skeleton with ruleTag
+// "juliang-sk5:<outbound>". At runtime we reuse that skeleton and replace its
+// reserved placeholder user with the real client emails assigned to the SK5.
+// Legacy/non-managed targets still receive generated rules. Clients sharing
+// one target are grouped into one Xray rule to keep the routing table compact.
 func injectClientEgress(cfg *xray.Config, clients []model.ClientRecord) {
 	if len(clients) == 0 {
 		return
@@ -559,7 +567,9 @@ func injectClientEgress(cfg *xray.Config, clients []model.ClientRecord) {
 		}
 	}
 	rules, _ := routing["rules"].([]any)
-	newRules := make([]any, 0, len(clients))
+
+	usersByTag := make(map[string][]any)
+	tagOrder := make([]string, 0)
 	for _, client := range clients {
 		email := strings.TrimSpace(client.Email)
 		tag := strings.TrimSpace(client.OutboundTag)
@@ -570,9 +580,53 @@ func injectClientEgress(cfg *xray.Config, clients []model.ClientRecord) {
 			logger.Warning("client egress: target tag [", tag, "] not found, skipping client [", email, "]")
 			continue
 		}
+		if _, exists := usersByTag[tag]; !exists {
+			tagOrder = append(tagOrder, tag)
+		}
+		usersByTag[tag] = append(usersByTag[tag], email)
+	}
+	if len(usersByTag) == 0 {
+		return
+	}
+
+	usedManaged := make(map[string]bool)
+	changed := false
+	for i, rawRule := range rules {
+		rule, ok := rawRule.(map[string]any)
+		if !ok {
+			continue
+		}
+		ruleTag, _ := rule["ruleTag"].(string)
+		if !strings.HasPrefix(ruleTag, juliangSK5RulePrefix) {
+			continue
+		}
+		target := strings.TrimSpace(strings.TrimPrefix(ruleTag, juliangSK5RulePrefix))
+		users, assigned := usersByTag[target]
+		if !assigned {
+			continue
+		}
+
+		rule["user"] = users
+		delete(rule, "outboundTag")
+		delete(rule, "balancerTag")
+		if routingTagIsBalancer(routing, target) {
+			rule["balancerTag"] = target
+		} else {
+			rule["outboundTag"] = target
+		}
+		rules[i] = rule
+		usedManaged[target] = true
+		changed = true
+	}
+
+	newRules := make([]any, 0, len(tagOrder))
+	for _, tag := range tagOrder {
+		if usedManaged[tag] {
+			continue
+		}
 		rule := map[string]any{
 			"type": "field",
-			"user": []any{email},
+			"user": usersByTag[tag],
 		}
 		if routingTagIsBalancer(routing, tag) {
 			rule["balancerTag"] = tag
@@ -581,10 +635,15 @@ func injectClientEgress(cfg *xray.Config, clients []model.ClientRecord) {
 		}
 		newRules = append(newRules, rule)
 	}
-	if len(newRules) == 0 {
+
+	if len(newRules) > 0 {
+		rules = append(newRules, rules...)
+		changed = true
+	}
+	if !changed {
 		return
 	}
-	routing["rules"] = append(newRules, rules...)
+	routing["rules"] = rules
 	newRouting, err := json.Marshal(routing)
 	if err != nil {
 		logger.Warning("client egress: failed to rebuild routing section, skipping injection:", err)

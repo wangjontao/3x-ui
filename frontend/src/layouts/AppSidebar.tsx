@@ -226,8 +226,7 @@ export default function AppSidebar() {
   const tabs = useMemo<{ key: string; icon: IconName; title: string }[]>(
     () => [
       { key: '/', icon: 'dashboard', title: t('menu.dashboard') },
-      { key: '/inbounds', icon: 'inbound', title: t('menu.inbounds') },
-      { key: '/clients', icon: 'team', title: t('menu.clients') },
+      { key: '/access', icon: 'inbound', title: t('menu.inboundClients') },
       { key: '/groups', icon: 'groups', title: t('menu.groups') },
       { key: '/nodes', icon: 'cluster', title: t('menu.nodes') },
       { key: '/hosts', icon: 'hosts', title: t('menu.hosts') },
@@ -244,6 +243,14 @@ export default function AppSidebar() {
 
   const navItems = useMemo(() => tabs.filter((tab) => tab.icon !== 'logout'), [tabs]);
   const utilItems = useMemo(() => tabs.filter((tab) => tab.icon === 'logout'), [tabs]);
+
+  const accessChildren = useMemo<NonNullable<MenuProps['items']>>(
+    () => [
+      { key: '/inbounds', icon: <ImportOutlined />, label: t('menu.inbounds') },
+      { key: '/clients', icon: <TeamOutlined />, label: t('menu.clients') },
+    ],
+    [t],
+  );
 
   const settingsChildren = useMemo<NonNullable<MenuProps['items']>>(() => {
     const children: NonNullable<MenuProps['items']> = [
@@ -301,6 +308,7 @@ export default function AppSidebar() {
     [t],
   );
 
+  const accessActive = pathname === '/inbounds' || pathname === '/clients';
   const settingsActive = pathname === '/settings';
   const xrayActive = pathname === '/xray';
   const selectedKey = settingsActive
@@ -311,7 +319,13 @@ export default function AppSidebar() {
         ? '/'
         : pathname;
 
-  const openSubmenu = settingsActive ? '/settings' : xrayActive ? '/xray' : null;
+  const openSubmenu = accessActive
+    ? '/access'
+    : settingsActive
+      ? '/settings'
+      : xrayActive
+        ? '/xray'
+        : null;
   const [openKeys, setOpenKeys] = useState<string[]>(() => (openSubmenu ? [openSubmenu] : []));
   if (openSubmenu && !openKeys.includes(openSubmenu)) {
     setOpenKeys([...openKeys, openSubmenu]);
@@ -321,6 +335,9 @@ export default function AppSidebar() {
     (items: typeof tabs): MenuProps['items'] =>
       items.map((tab) => {
         const Icon = iconByName[tab.icon];
+        if (tab.key === '/access') {
+          return { key: tab.key, icon: <Icon />, label: tab.title, children: accessChildren };
+        }
         if (tab.key === '/settings') {
           return { key: tab.key, icon: <Icon />, label: tab.title, children: settingsChildren };
         }
@@ -329,7 +346,7 @@ export default function AppSidebar() {
         }
         return { key: tab.key, icon: <Icon />, label: tab.title, title: '' };
       }),
-    [settingsChildren, xrayChildren],
+    [accessChildren, settingsChildren, xrayChildren],
   );
 
   const openLink = useCallback(
@@ -383,7 +400,7 @@ export default function AppSidebar() {
       >
         <div className="sider-brand">
           <div className="brand-block">
-            <span className="brand-text">{railCollapsed ? 'JL' : 'JuLiang-UI'}</span>
+            <span className="brand-text">{railCollapsed ? 'JT' : 'JuLiang-TK'}</span>
           </div>
           {!railCollapsed && (
             <div className="brand-actions">
@@ -478,7 +495,7 @@ export default function AppSidebar() {
       >
         <div className="drawer-header">
           <div className="brand-block">
-            <span className="drawer-brand">3X-UI</span>
+            <span className="drawer-brand">JuLiang-TK</span>
           </div>
           <div className="drawer-header-actions">
             <DocsButton ariaLabel={t('menu.docs') || 'Documentation'} />

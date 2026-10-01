@@ -63,3 +63,36 @@ func TestInjectClientEgressBalancer(t *testing.T) {
 		t.Fatal("balancer rule must not also carry outboundTag")
 	}
 }
+
+func TestInjectClientEgressReusesManagedSK5Rule(t *testing.T) {
+	cfg := &xray.Config{
+		OutboundConfigs: json_util.RawMessage(`[{"tag":"socks-us","protocol":"socks","settings":{}}]`),
+		RouterConfig: json_util.RawMessage(`{"rules":[{"type":"field","comment":"JuLiang-TK SK5","ruleTag":"juliang-sk5:socks-us","user":["__juliang_tk_unassigned__:socks-us"],"outboundTag":"socks-us"}]}`),
+	}
+	injectClientEgress(cfg, []model.ClientRecord{
+		{Email: "alice@example.com", Enable: true, OutboundTag: "socks-us"},
+		{Email: "bob@example.com", Enable: true, OutboundTag: "socks-us"},
+		{Email: "off@example.com", Enable: false, OutboundTag: "socks-us"},
+	})
+
+	var routing map[string]any
+	if err := json.Unmarshal(cfg.RouterConfig, &routing); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := routing["rules"].([]any)
+	if len(rules) != 1 {
+		t.Fatalf("expected one managed rule, got %d", len(rules))
+	}
+	first, _ := rules[0].(map[string]any)
+	if got := first["ruleTag"]; got != "juliang-sk5:socks-us" {
+		t.Fatalf("ruleTag = %v", got)
+	}
+	if got := first["outboundTag"]; got != "socks-us" {
+		t.Fatalf("outboundTag = %v", got)
+	}
+	users, _ := first["user"].([]any)
+	if len(users) != 2 || users[0] != "alice@example.com" || users[1] != "bob@example.com" {
+		t.Fatalf("user match = %#v", users)
+	}
+}
+

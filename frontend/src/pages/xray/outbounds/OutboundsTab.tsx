@@ -65,6 +65,8 @@ import OutboundCardList from './OutboundCardList';
 import SubscriptionOutbounds from './SubscriptionOutbounds';
 
 const defaultOutboundSubscriptionUserAgent = '3x-ui-outbound-sub/1.0';
+const JULIANG_SK5_RULE_PREFIX = 'juliang-sk5:';
+const JULIANG_SK5_UNASSIGNED_PREFIX = '__juliang_tk_unassigned__:';
 
 interface OutboundSub {
   id: number;
@@ -343,6 +345,34 @@ export default function OutboundsTab({
     mutate((tt) => {
       if (!Array.isArray(tt.outbounds)) tt.outbounds = [];
       tt.outbounds.push(...(parsed.outbounds as never[]));
+
+      if (!tt.routing) tt.routing = {};
+      if (!Array.isArray(tt.routing.rules)) tt.routing.rules = [];
+
+      const managedTargets = new Set(
+        tt.routing.rules
+          .filter(
+            (rule) =>
+              typeof rule.ruleTag === 'string' &&
+              rule.ruleTag.startsWith(JULIANG_SK5_RULE_PREFIX),
+          )
+          .map((rule) => rule.outboundTag)
+          .filter((tag): tag is string => typeof tag === 'string' && tag.length > 0),
+      );
+
+      for (const outbound of parsed.outbounds) {
+        const tag = typeof outbound.tag === 'string' ? outbound.tag.trim() : '';
+        if (!tag || managedTargets.has(tag)) continue;
+        tt.routing.rules.push({
+          type: 'field',
+          enabled: true,
+          comment: `JuLiang-TK SK5 · ${tag} · 客户端选择后自动绑定`,
+          user: [`${JULIANG_SK5_UNASSIGNED_PREFIX}${tag}`],
+          outboundTag: tag,
+          ruleTag: `${JULIANG_SK5_RULE_PREFIX}${tag}`,
+        });
+        managedTargets.add(tag);
+      }
     });
 
     messageApi.success(`${t('pages.xray.sk5ImportSuccess')}: ${parsed.outbounds.length}`);
