@@ -10,6 +10,13 @@ cur_dir=$(pwd)
 
 xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
+JULIANG_REPO="wangjontao/3x-ui"
+JULIANG_BRANCH="juliang-stable-v2.9.3"
+JULIANG_PANEL_VERSION="v2.9.3"
+JULIANG_XRAY_VERSION="v26.4.25"
+JULIANG_RELEASE="juliang-v2.9.3-r1"
+JULIANG_RELEASE_BASE="https://github.com/${JULIANG_REPO}/releases/download/${JULIANG_RELEASE}"
+JULIANG_RAW_BASE="https://raw.githubusercontent.com/${JULIANG_REPO}/${JULIANG_BRANCH}"
 
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}Fatal error: ${plain} Please run this script with root privilege \n " && exit 1
@@ -785,42 +792,19 @@ config_after_install() {
 install_x-ui() {
     cd ${xui_folder%/x-ui}/
     
-    # Download resources
-    if [ $# == 0 ]; then
-        tag_version=$(curl -Ls "https://api.github.com/repos/MHSanaei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        if [[ ! -n "$tag_version" ]]; then
-            echo -e "${yellow}Trying to fetch version with IPv4...${plain}"
-            tag_version=$(curl -4 -Ls "https://api.github.com/repos/MHSanaei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-            if [[ ! -n "$tag_version" ]]; then
-                echo -e "${red}Failed to fetch x-ui version, it may be due to GitHub API restrictions, please try it later${plain}"
-                exit 1
-            fi
-        fi
-        echo -e "Got x-ui latest version: ${tag_version}, beginning the installation..."
-        curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz
-        if [[ $? -ne 0 ]]; then
-            echo -e "${red}Downloading x-ui failed, please be sure that your server can access GitHub ${plain}"
-            exit 1
-        fi
-    else
-        tag_version=$1
-        tag_version_numeric=${tag_version#v}
-        min_version="2.3.5"
-        
-        if [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
-            echo -e "${red}Please use a newer version (at least v2.3.5). Exiting installation.${plain}"
-            exit 1
-        fi
-        
-        url="https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
-        echo -e "Beginning to install x-ui $1"
-        curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz ${url}
-        if [[ $? -ne 0 ]]; then
-            echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
-            exit 1
-        fi
+    # JuLiang Stable: panel/core are intentionally pinned.
+    tag_version="${JULIANG_PANEL_VERSION}"
+    if [[ $# -gt 0 && "$1" != "${JULIANG_PANEL_VERSION}" && "$1" != "${JULIANG_RELEASE}" ]]; then
+        echo -e "${yellow}JuLiang Stable 已锁定到 3x-ui ${JULIANG_PANEL_VERSION} / Xray ${JULIANG_XRAY_VERSION}，忽略请求版本：$1${plain}"
     fi
-    curl -4fLRo /usr/bin/x-ui-temp https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
+    echo -e "${green}JuLiang Stable 固定版本：3x-ui ${JULIANG_PANEL_VERSION} / Xray ${JULIANG_XRAY_VERSION}${plain}"
+    echo -e "${green}固定发布：${JULIANG_RELEASE}${plain}"
+    curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz "${JULIANG_RELEASE_BASE}/x-ui-linux-$(arch).tar.gz"
+    if [[ $? -ne 0 ]]; then
+        echo -e "${red}下载 JuLiang Stable 固定安装包失败：${JULIANG_RELEASE}${plain}"
+        exit 1
+    fi
+    curl -4fLRo /usr/bin/x-ui-temp "${JULIANG_RAW_BASE}/x-ui.sh"
     if [[ $? -ne 0 ]]; then
         echo -e "${red}Failed to download x-ui.sh${plain}"
         exit 1
@@ -872,7 +856,7 @@ install_x-ui() {
     fi
     
     if [[ $release == "alpine" ]]; then
-        curl -4fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.rc
+        curl -4fLRo /etc/init.d/x-ui ${JULIANG_RAW_BASE}/x-ui.rc
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Failed to download x-ui.rc${plain}"
             exit 1
@@ -929,13 +913,13 @@ install_x-ui() {
             echo -e "${yellow}Service files not found in tar.gz, downloading from GitHub...${plain}"
             case "${release}" in
                 ubuntu | debian | armbian)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.debian >/dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service ${JULIANG_RAW_BASE}/x-ui.service.debian >/dev/null 2>&1
                 ;;
                 arch | manjaro | parch)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.arch >/dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service ${JULIANG_RAW_BASE}/x-ui.service.arch >/dev/null 2>&1
                 ;;
                 *)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.rhel >/dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service ${JULIANG_RAW_BASE}/x-ui.service.rhel >/dev/null 2>&1
                 ;;
             esac
             
@@ -959,7 +943,7 @@ install_x-ui() {
         fi
     fi
     
-    echo -e "${green}x-ui ${tag_version}${plain} installation finished, it is running now..."
+    echo -e "${green}JuLiang-UI Stable ${tag_version} installation finished; Xray ${JULIANG_XRAY_VERSION}.${plain}"
     echo -e ""
     echo -e "┌───────────────────────────────────────────────────────┐
 │  ${blue}x-ui control menu usages (subcommands):${plain}              │

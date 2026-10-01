@@ -73,6 +73,12 @@ os_version=$(grep "^VERSION_ID" /etc/os-release | cut -d '=' -f2 | tr -d '"' | t
 xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
 log_folder="${XUI_LOG_FOLDER:=/var/log/x-ui}"
+JULIANG_REPO="wangjontao/3x-ui"
+JULIANG_BRANCH="juliang-stable-v2.9.3"
+JULIANG_PANEL_VERSION="v2.9.3"
+JULIANG_XRAY_VERSION="v26.4.25"
+JULIANG_RELEASE="juliang-v2.9.3-r1"
+JULIANG_RAW_BASE="https://raw.githubusercontent.com/${JULIANG_REPO}/${JULIANG_BRANCH}"
 mkdir -p "${log_folder}"
 iplimit_log_path="${log_folder}/3xipl.log"
 iplimit_banned_log_path="${log_folder}/3xipl-banned.log"
@@ -108,7 +114,7 @@ before_show_menu() {
 }
 
 install() {
-    bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/main/install.sh)
+    bash <(curl -Ls "${JULIANG_RAW_BASE}/install.sh")
     if [[ $? == 0 ]]; then
         if [[ $# == 0 ]]; then
             start
@@ -118,59 +124,39 @@ install() {
     fi
 }
 
+show_version_lock() {
+    echo -e "${green}JuLiang-UI Stable 版本锁定：${plain}"
+    echo -e "  3x-ui: ${yellow}${JULIANG_PANEL_VERSION}${plain}"
+    echo -e "  Xray:  ${yellow}${JULIANG_XRAY_VERSION}${plain}"
+    echo -e "  Release: ${yellow}${JULIANG_RELEASE}${plain}"
+    echo -e "  Stable 分支不会跟随 MHSanaei/3x-ui main 自动升级。"
+}
+
 update() {
-    confirm "This function will update all x-ui components to the latest version, and the data will not be lost. Do you want to continue?" "y"
-    if [[ $? != 0 ]]; then
-        LOGE "Cancelled"
-        if [[ $# == 0 ]]; then
-            before_show_menu
-        fi
-        return 0
-    fi
-    bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/main/update.sh)
-    if [[ $? == 0 ]]; then
-        LOGI "Update is complete, Panel has automatically restarted "
+    show_version_lock
+    echo -e "${yellow}稳定版自动升级已禁用。需要测试新版本时请使用 juliang-next / 独立升级分支。${plain}"
+    if [[ $# == 0 ]]; then
         before_show_menu
     fi
+    return 0
 }
 
 update_menu() {
-    echo -e "${yellow}Updating Menu${plain}"
-    confirm "This function will update the menu to the latest changes." "y"
-    if [[ $? != 0 ]]; then
-        LOGE "Cancelled"
-        if [[ $# == 0 ]]; then
-            before_show_menu
-        fi
-        return 0
+    show_version_lock
+    echo -e "${yellow}菜单在线更新已禁用，避免从上游 main 覆盖稳定版。${plain}"
+    if [[ $# == 0 ]]; then
+        before_show_menu
     fi
-
-    curl -fLRo /usr/bin/x-ui https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
-    chmod +x ${xui_folder}/x-ui.sh
-    chmod +x /usr/bin/x-ui
-
-    if [[ $? == 0 ]]; then
-        echo -e "${green}Update successful. The panel has automatically restarted.${plain}"
-        exit 0
-    else
-        echo -e "${red}Failed to update the menu.${plain}"
-        return 1
-    fi
+    return 0
 }
 
 legacy_version() {
-    echo -n "Enter the panel version (like 2.4.0):"
-    read -r tag_version
-
-    if [ -z "$tag_version" ]; then
-        echo "Panel version cannot be empty. Exiting."
-        exit 1
+    show_version_lock
+    echo -e "${yellow}稳定版禁止切换到其他 3x-ui 版本。${plain}"
+    if [[ $# == 0 ]]; then
+        before_show_menu
     fi
-    # Use the entered panel version in the download link
-    install_command="bash <(curl -Ls "https://raw.githubusercontent.com/mhsanaei/3x-ui/v$tag_version/install.sh") v$tag_version"
-
-    echo "Downloading and installing panel version $tag_version..."
-    eval $install_command
+    return 0
 }
 
 # Function to handle the deletion of the script file
@@ -206,7 +192,7 @@ uninstall() {
     echo ""
     echo -e "Uninstalled Successfully.\n"
     echo "If you need to install this panel again, you can use below command:"
-    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)${plain}"
+    echo -e "${green}bash <(curl -Ls ${JULIANG_RAW_BASE}/install.sh)${plain}"
     echo ""
     # Trap the SIGTERM signal
     trap delete_script SIGTERM
@@ -604,7 +590,7 @@ enable_bbr() {
 }
 
 update_shell() {
-    curl -fLRo /usr/bin/x-ui -z /usr/bin/x-ui https://github.com/MHSanaei/3x-ui/raw/main/x-ui.sh
+    curl -fLRo /usr/bin/x-ui -z /usr/bin/x-ui ${JULIANG_RAW_BASE}/x-ui.sh
     if [[ $? != 0 ]]; then
         echo ""
         LOGE "Failed to download script, Please check whether the machine can connect Github"
@@ -2194,7 +2180,7 @@ show_usage() {
 │  ${blue}x-ui disable${plain}               - Disable Autostart on OS Startup  │
 │  ${blue}x-ui log${plain}                   - Check logs                       │
 │  ${blue}x-ui banlog${plain}                - Check Fail2ban ban logs          │
-│  ${blue}x-ui update${plain}                - Update                           │
+│  ${blue}x-ui update${plain}                - Update [LOCKED]                  │
 │  ${blue}x-ui update-all-geofiles${plain}   - Update all geo files             │
 │  ${blue}x-ui legacy${plain}                - Legacy version                   │
 │  ${blue}x-ui install${plain}               - Install                          │
@@ -2205,7 +2191,7 @@ show_usage() {
 show_menu() {
     echo -e "
 ╔────────────────────────────────────────────────╗
-│   ${green}3X-UI Panel Management Script${plain}                │
+│   ${green}JuLiang-UI Stable Management${plain}                │
 │   ${green}0.${plain} Exit Script                               │
 │────────────────────────────────────────────────│
 │   ${green}1.${plain} Install                                   │
