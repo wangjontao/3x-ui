@@ -259,6 +259,14 @@ func (s *ClientService) Create(inboundSvc *InboundService, payload *ClientCreate
 	// A re-created email is a live identity again: a delete tombstone left
 	// standing makes the next node merge prune the new client's inbound links.
 	withdrawClientTombstones(client.Email)
+	// outboundTag is panel-only routing metadata. Persist it explicitly so a
+	// client can select or clear its landing route without depending on how an
+	// inbound protocol serializes its user object.
+	if err := database.GetDB().Model(&model.ClientRecord{}).
+		Where("email = ?", client.Email).
+		UpdateColumn("outbound_tag", strings.TrimSpace(client.OutboundTag)).Error; err != nil {
+		return needRestart, err
+	}
 	return needRestart, s.setClientLimitHwidByEmail(client.Email, payload.LimitHwid)
 }
 
@@ -817,6 +825,14 @@ func (s *ClientService) Update(inboundSvc *InboundService, id int, updated model
 	if err := database.GetDB().Model(&model.ClientRecord{}).
 		Where("id = ?", id).
 		UpdateColumn("ad_tag", updated.AdTag).Error; err != nil {
+		return needRestart, err
+	}
+
+	// Keep the client-selected landing route in the client table, including an
+	// empty value which means "use normal/direct routing".
+	if err := database.GetDB().Model(&model.ClientRecord{}).
+		Where("id = ?", id).
+		UpdateColumn("outbound_tag", strings.TrimSpace(updated.OutboundTag)).Error; err != nil {
 		return needRestart, err
 	}
 
