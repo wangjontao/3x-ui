@@ -32,6 +32,7 @@ export function useInboundColumns({
   clientCount,
   subEnable,
   expireDiff,
+  trafficDiff,
   onRowAction,
   onSwitchEnable,
 }: UseInboundColumnsParams): TableColumnType<DBInboundRecord>[] {
@@ -176,7 +177,7 @@ export function useInboundColumns({
           const used = record.up + record.down;
           return (
             <Popover content={`↑ ${SizeFormatter.sizeFormat(record.up)} / ↓ ${SizeFormatter.sizeFormat(record.down)}`}>
-              <Tag color={record.total > 0 ? ColorUtils.usageColor(used, record.total) : 'default'}>
+              <Tag color={record.total > 0 ? ColorUtils.usageColor(used, trafficDiff, record.total) : 'default'}>
                 {SizeFormatter.sizeFormat(used)} / {record.total > 0 ? SizeFormatter.sizeFormat(record.total) : '∞'}
               </Tag>
             </Popover>
@@ -217,6 +218,7 @@ export function useInboundColumns({
     clientCount,
     subEnable,
     expireDiff,
+    trafficDiff,
     onRowAction,
     onSwitchEnable,
   ]);

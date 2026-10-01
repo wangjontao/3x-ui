@@ -74,7 +74,7 @@ type RowAction =
   | 'addToGroup'
   | 'clone';
 
-type GeneralAction = 'import' | 'export' | 'subs' | 'resetInbounds';
+type GeneralAction = 'import' | 'export' | 'exportClients' | 'subs' | 'resetInbounds';
 
 interface ClientMatchTarget {
   id?: string;
