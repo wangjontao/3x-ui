@@ -10,3 +10,5 @@ Status: **LOCKED**
 - Upgrade/testing branch: **juliang-next**
 
 The stable branch must not merge/rebase upstream main. Panel/core self-update is disabled. New upstream versions must be tested and released from a separate branch.
+
+Compatibility alias: `juliang-ui-v1` is pinned to the same stable commit so existing raw installer URLs do not follow the new frontend branch. The preserved development line is `juliang-next`.
