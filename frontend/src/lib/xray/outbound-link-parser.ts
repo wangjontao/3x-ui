@@ -789,7 +789,6 @@ export function parseSocksLink(link: string): Raw | null {
   };
 }
 
-
 export interface SocksBatchParseError {
   line: number;
   input: string;
@@ -846,7 +845,13 @@ export function parseSocksBatch(
     const port = Number(portText);
     const user = userRaw.trim();
     const pass = passRaw.trim();
-    if (!address || !/^\d+$/.test(portText) || !Number.isInteger(port) || port < 1 || port > 65535)
+    if (
+      !address ||
+      !/^\d+$/.test(portText) ||
+      !Number.isInteger(port) ||
+      port < 1 ||
+      port > 65535
+    )
       return null;
     // A half-filled credential pair is almost always a pasted-format error.
     if ((user && !pass) || (!user && pass)) return null;
