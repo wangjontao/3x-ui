@@ -8,6 +8,7 @@ import {
   parseVmessLink,
   parseHysteria2Link,
   parseSocksLink,
+  parseSocksBatch,
   parseWireguardLink,
 } from '@/lib/xray/outbound-link-parser';
 import { Base64 } from '@/utils';
@@ -485,6 +486,63 @@ describe('parseSocksLink', () => {
 
   it('returns null for unrelated links', () => {
     expect(parseSocksLink('vless://uuid@example.com:443')).toBeNull();
+  });
+});
+
+
+describe('parseSocksBatch', () => {
+  it('imports mixed socks5 URLs and pipe rows in one paste', () => {
+    const parsed = parseSocksBatch(
+      [
+        'socks5://user1:pass1@1.2.3.4:1080#US-ATT',
+        '5.6.7.8|2080|user2|pass2|US-Comcast',
+        'proxy.example:3080:user3:pass3:US-Cox',
+      ].join('\n'),
+    );
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.outbounds).toHaveLength(3);
+    expect(parsed.outbounds.map((o) => o.tag)).toEqual(['US-ATT', 'US-Comcast', 'US-Cox']);
+    expect((parsed.outbounds[1].settings as Record<string, unknown>).servers).toEqual([
+      {
+        address: '5.6.7.8',
+        port: 2080,
+        users: [{ user: 'user2', pass: 'pass2' }],
+      },
+    ]);
+  });
+
+  it('auto-generates missing tags and avoids existing/duplicate tag collisions', () => {
+    const parsed = parseSocksBatch(
+      [
+        '10.0.0.1|1080|u|p|US',
+        '10.0.0.2|1080|u|p|US',
+        '10.0.0.3|1080|u|p|',
+      ].join('\n'),
+      ['US'],
+    );
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.outbounds.map((o) => o.tag)).toEqual([
+      'US-2',
+      'US-3',
+      'SK5-003-10.0.0.3',
+    ]);
+  });
+
+  it('keeps valid rows and reports malformed rows instead of aborting the whole paste', () => {
+    const parsed = parseSocksBatch(
+      [
+        '# provider export',
+        '1.1.1.1|1080|good|secret|one',
+        'bad-row',
+        '2.2.2.2|70000|u|p|bad-port',
+        '3.3.3.3|1080|only-user||half-auth',
+      ].join('\n'),
+    );
+
+    expect(parsed.outbounds).toHaveLength(1);
+    expect(parsed.errors.map((e) => e.line)).toEqual([3, 4, 5]);
   });
 });
 
