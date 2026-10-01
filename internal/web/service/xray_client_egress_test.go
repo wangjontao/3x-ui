@@ -67,7 +67,7 @@ func TestInjectClientEgressBalancer(t *testing.T) {
 func TestInjectClientEgressReusesManagedSK5Rule(t *testing.T) {
 	cfg := &xray.Config{
 		OutboundConfigs: json_util.RawMessage(`[{"tag":"socks-us","protocol":"socks","settings":{}}]`),
-		RouterConfig: json_util.RawMessage(`{"rules":[{"type":"field","comment":"JuLiang-TK SK5","ruleTag":"juliang-sk5:socks-us","user":["__juliang_tk_unassigned__:socks-us"],"outboundTag":"socks-us"}]}`),
+		RouterConfig:    json_util.RawMessage(`{"rules":[{"type":"field","comment":"JuLiang-TK SK5","ruleTag":"juliang-sk5:socks-us","user":["__juliang_tk_unassigned__:socks-us"],"outboundTag":"socks-us"}]}`),
 	}
 	injectClientEgress(cfg, []model.ClientRecord{
 		{Email: "alice@example.com", Enable: true, OutboundTag: "socks-us"},

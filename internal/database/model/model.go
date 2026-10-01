@@ -935,7 +935,7 @@ type ClientRecord struct {
 	ForwardedPorts  string `json:"forwardedPorts" gorm:"column:wg_forwarded_ports"`
 	Secret          string `json:"secret" gorm:"column:secret"`
 	AdTag           string `json:"adTag" gorm:"column:ad_tag;default:''"`
-	OutboundTag      string `json:"outboundTag" gorm:"column:outbound_tag;default:''"`
+	OutboundTag     string `json:"outboundTag" gorm:"column:outbound_tag;default:''"`
 	LimitIP         int    `json:"limitIp" gorm:"column:limit_ip"`
 	LimitHwid       int    `json:"limitHwid" gorm:"column:limit_hwid;default:0"`
 	TotalGB         int64  `json:"totalGB" gorm:"column:total_gb"`
