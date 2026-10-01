@@ -1721,6 +1721,9 @@ export const SCHEMAS: Record<string, unknown> = {
         "description": "IP limit for this client",
         "type": "integer"
       },
+      "outboundTag": {
+        "type": "string"
+      },
       "password": {
         "description": "Client password",
         "type": "string"
@@ -1943,6 +1946,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "limitIp": {
         "type": "integer"
       },
+      "outboundTag": {
+        "type": "string"
+      },
       "password": {
         "type": "string"
       },
@@ -2015,6 +2021,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "keepAlive",
       "limitHwid",
       "limitIp",
+      "outboundTag",
       "password",
       "preSharedKey",
       "privateKey",
