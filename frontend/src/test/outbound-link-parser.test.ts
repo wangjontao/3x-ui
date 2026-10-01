@@ -1039,8 +1039,12 @@ describe('parseOutboundLink dispatcher', () => {
     ).toBe('wireguard');
   });
 
-  it('returns null for an unknown scheme', () => {
-    expect(parseOutboundLink('socks5://user:pass@host:1080')).toBeNull();
+  it('dispatches SOCKS5 via URL', () => {
+    expect(parseOutboundLink('socks5://user:pass@host:1080')?.protocol).toBe('socks');
+  });
+
+  it('returns null for a genuinely unknown scheme', () => {
+    expect(parseOutboundLink('unknown://user:pass@host:1080')).toBeNull();
   });
 
   it('returns null for empty input', () => {
