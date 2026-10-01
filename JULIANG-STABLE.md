@@ -1,5 +1,7 @@
 # JuLiang-UI Stable Version Lock
 
+Status: **LOCKED**
+
 - 3x-ui source baseline: **v2.9.3**
 - Upstream commit: `0b5c239f98fd112df10ed4846377563a391ebf60`
 - Xray-core: **v26.4.25**
