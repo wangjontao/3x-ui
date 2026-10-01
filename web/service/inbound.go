@@ -725,6 +725,11 @@ func (s *InboundService) AddInboundClient(data *model.Inbound) (bool, error) {
 	needRestart := false
 	s.xrayApi.Init(p.GetAPIPort())
 	for _, client := range clients {
+		if strings.TrimSpace(client.OutboundTag) != "" {
+			// JuLiang per-client landing is implemented in routing; dynamic
+			// AddUser cannot update routing, so request a full Xray reload.
+			needRestart = true
+		}
 		if len(client.Email) > 0 {
 			s.AddClientStat(tx, data.Id, &client)
 			if client.Enable {
@@ -979,12 +984,16 @@ func (s *InboundService) DelInboundClient(inboundId int, clientId string) (bool,
 	interfaceClients := settings["clients"].([]any)
 	var newClients []any
 	needApiDel := false
+	boundLanding := false
 	for _, client := range interfaceClients {
 		c := client.(map[string]any)
 		c_id := c[client_key].(string)
 		if c_id == clientId {
 			email, _ = c["email"].(string)
 			needApiDel, _ = c["enable"].(bool)
+			if outboundTag, ok := c["outboundTag"].(string); ok && strings.TrimSpace(outboundTag) != "" {
+				boundLanding = true
+			}
 		} else {
 			newClients = append(newClients, client)
 		}
@@ -1009,7 +1018,7 @@ func (s *InboundService) DelInboundClient(inboundId int, clientId string) (bool,
 		logger.Error("Error in delete client IPs")
 		return false, err
 	}
-	needRestart := false
+	needRestart := boundLanding
 
 	if len(email) > 0 {
 		notDepleted := true
@@ -1177,7 +1186,11 @@ func (s *InboundService) UpdateInboundClient(data *model.Inbound, clientId strin
 			return false, err
 		}
 	}
-	needRestart := false
+	needRestart := strings.TrimSpace(oldClients[clientIndex].OutboundTag) != "" ||
+		strings.TrimSpace(clients[0].OutboundTag) != ""
+	if needRestart {
+		logger.Debug("JuLiang client landing routing changed/active; Xray config reload required")
+	}
 	if len(oldEmail) > 0 {
 		s.xrayApi.Init(p.GetAPIPort())
 		if oldClients[clientIndex].Enable {
