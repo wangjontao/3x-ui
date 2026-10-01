@@ -3,6 +3,7 @@ import { rawInboundToFormValues, formValuesToWirePayload } from '@/lib/xray/inbo
 import {
   createDefaultVlessClient,
   createDefaultVlessInboundSettings,
+  type VlessClientSeed,
 } from '@/lib/xray/inbound-defaults';
 import { InboundFormSchema } from '@/schemas/forms/inbound-form';
 import { RealityStreamSettingsSchema } from '@/schemas/protocols/security/reality';
@@ -72,12 +73,12 @@ function oneClickUuid(): string {
   });
 }
 
-function oneClickClient(flow = '') {
+function oneClickClient(flow: VlessClientSeed['flow'] = '') {
   return createDefaultVlessClient({
     id: oneClickUuid(),
     email: RandomUtil.randomLowerAndNum(10),
     subId: RandomUtil.randomLowerAndNum(16),
-    flow: flow as Parameters<typeof createDefaultVlessClient>[0]['flow'],
+    flow,
   });
 }
 
