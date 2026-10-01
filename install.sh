@@ -83,16 +83,16 @@ is_port_in_use() {
 install_base() {
     case "${release}" in
         ubuntu | debian | armbian)
-            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl procps kmod
+            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl procps kmod procps kmod
         ;;
         fedora | amzn | virtuozzo | rhel | almalinux | rocky | ol)
-            dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl procps-ng kmod
+            dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl procps-ng kmod procps-ng kmod
         ;;
         centos)
             if [[ "${VERSION_ID}" =~ ^7 ]]; then
                 yum -y update && yum install -y cronie curl tar tzdata socat ca-certificates openssl procps-ng kmod
             else
-                dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl
+                dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl procps-ng kmod
             fi
         ;;
         arch | manjaro | parch)
@@ -105,7 +105,7 @@ install_base() {
             apk update && apk add dcron curl tar tzdata socat ca-certificates openssl procps kmod
         ;;
         *)
-            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl
+            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl procps kmod
         ;;
     esac
 }
