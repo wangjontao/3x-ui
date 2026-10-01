@@ -23,7 +23,7 @@ permissions:
 
 concurrency:
   group: juliang-release
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-linux:
