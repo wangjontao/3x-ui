@@ -133,6 +133,19 @@
                         "pages.inbounds.addInbound" }}</template>
                     </a-button>
                     <a-dropdown :trigger="['click']">
+                      <a-button type="primary" icon="thunderbolt">
+                        <template v-if="!isMobile">一键组合</template>
+                      </a-button>
+                      <a-menu slot="overlay" @click="a => openOneClickInbound(a.key)"
+                        :theme="themeSwitcher.currentTheme">
+                        <a-menu-item key="vless-tcp-reality-vision">VLESS · TCP · Reality · Vision</a-menu-item>
+                        <a-menu-item key="vless-grpc-reality">VLESS · gRPC · Reality</a-menu-item>
+                        <a-menu-item key="vless-xhttp-reality">VLESS · XHTTP · Reality</a-menu-item>
+                        <a-menu-item key="trojan-xhttp-reality">Trojan · XHTTP · Reality</a-menu-item>
+                        <a-menu-item key="hysteria2-tls-h3">Hysteria2 · TLS · H3</a-menu-item>
+                      </a-menu>
+                    </a-dropdown>
+                    <a-dropdown :trigger="['click']">
                       <a-button type="primary" icon="menu">
                         <template v-if="!isMobile">{{ i18n
                           "pages.inbounds.generalActions" }}</template>
@@ -1432,6 +1445,105 @@
           sniffing: baseInbound.sniffing.toString(),
         };
         await this.submit('/panel/api/inbounds/add', data, inModal);
+      },
+      async getRealityKeyPair() {
+        const msg = await HttpUtil.get("/panel/api/server/getNewX25519Cert");
+        if (!msg.success || !msg.obj || !msg.obj.privateKey || !msg.obj.publicKey) {
+          this.$message.error('Reality 密钥生成失败');
+          return null;
+        }
+        return msg.obj;
+      },
+      async openOneClickInbound(kind) {
+        const inbound = new Inbound();
+        const dbInbound = new DBInbound();
+        dbInbound.enable = true;
+
+        const openPrepared = () => {
+          inModal.show({
+            title: '一键组合 · ' + dbInbound.remark,
+            okText: '{{ i18n "create"}}',
+            inbound: inbound,
+            dbInbound: dbInbound,
+            confirm: async (preparedInbound, preparedDbInbound) => {
+              await this.addInbound(preparedInbound, preparedDbInbound, inModal);
+            },
+            isEdit: false
+          });
+        };
+
+        if (kind === 'hysteria2-tls-h3') {
+          inbound.protocol = Protocols.HYSTERIA;
+          inbound.stream.network = 'hysteria';
+          inbound.stream.security = 'tls';
+          inbound.stream.tls.alpn = [ALPN_OPTION.H3];
+          inbound.stream.tls.settings.fingerprint = UTLS_FINGERPRINT.UTLS_CHROME;
+          if (inbound.stream.tls.certs && inbound.stream.tls.certs.length > 0) {
+            inbound.stream.tls.certs[0].useFile = true;
+            inbound.stream.tls.certs[0].certFile = this.defaultCert || '';
+            inbound.stream.tls.certs[0].keyFile = this.defaultKey || '';
+          }
+          dbInbound.remark = 'Hysteria2-TLS-H3';
+          if (!this.defaultCert || !this.defaultKey) {
+            this.$message.warning('未检测到默认 TLS 证书，请在保存前填写证书路径。');
+          }
+          openPrepared();
+          return;
+        }
+
+        const pair = await this.getRealityKeyPair();
+        if (!pair) return;
+        const randomTarget = typeof getRandomRealityTarget !== 'undefined'
+          ? getRandomRealityTarget()
+          : { target: 'www.microsoft.com:443', sni: 'www.microsoft.com' };
+
+        if (kind === 'trojan-xhttp-reality') {
+          inbound.protocol = Protocols.TROJAN;
+        } else {
+          inbound.protocol = Protocols.VLESS;
+        }
+        inbound.stream.security = 'reality';
+        inbound.stream.reality.privateKey = pair.privateKey;
+        inbound.stream.reality.settings.publicKey = pair.publicKey;
+        inbound.stream.reality.settings.fingerprint = UTLS_FINGERPRINT.UTLS_CHROME;
+        inbound.stream.reality.settings.spiderX = '/';
+        inbound.stream.reality.target = randomTarget.target || 'www.microsoft.com:443';
+        inbound.stream.reality.serverNames = randomTarget.sni || 'www.microsoft.com';
+
+        switch (kind) {
+          case 'vless-tcp-reality-vision':
+            inbound.stream.network = 'tcp';
+            if (inbound.settings.vlesses && inbound.settings.vlesses[0]) {
+              inbound.settings.vlesses[0].flow = TLS_FLOW_CONTROL.VISION;
+            }
+            dbInbound.remark = 'VLESS-TCP-Reality-Vision';
+            break;
+          case 'vless-grpc-reality':
+            inbound.stream.network = 'grpc';
+            inbound.stream.grpc.serviceName = '';
+            inbound.stream.grpc.authority = '';
+            inbound.stream.grpc.multiMode = false;
+            dbInbound.remark = 'VLESS-gRPC-Reality';
+            break;
+          case 'vless-xhttp-reality':
+            inbound.stream.network = 'xhttp';
+            inbound.stream.xhttp.path = '/';
+            inbound.stream.xhttp.mode = MODE_OPTION.AUTO;
+            inbound.stream.xhttp.xPaddingBytes = '100-1000';
+            dbInbound.remark = 'VLESS-XHTTP-Reality';
+            break;
+          case 'trojan-xhttp-reality':
+            inbound.stream.network = 'xhttp';
+            inbound.stream.xhttp.path = '/';
+            inbound.stream.xhttp.mode = MODE_OPTION.AUTO;
+            inbound.stream.xhttp.xPaddingBytes = '100-1000';
+            dbInbound.remark = 'Trojan-XHTTP-Reality';
+            break;
+          default:
+            this.$message.error('未知的一键组合');
+            return;
+        }
+        openPrepared();
       },
       openAddInbound() {
         inModal.show({
