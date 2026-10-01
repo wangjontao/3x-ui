@@ -83,26 +83,26 @@ is_port_in_use() {
 install_base() {
     case "${release}" in
         ubuntu | debian | armbian)
-            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl
+            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl procps kmod
         ;;
         fedora | amzn | virtuozzo | rhel | almalinux | rocky | ol)
-            dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl
+            dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl procps-ng kmod
         ;;
         centos)
             if [[ "${VERSION_ID}" =~ ^7 ]]; then
-                yum -y update && yum install -y cronie curl tar tzdata socat ca-certificates openssl
+                yum -y update && yum install -y cronie curl tar tzdata socat ca-certificates openssl procps-ng kmod
             else
                 dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl
             fi
         ;;
         arch | manjaro | parch)
-            pacman -Syu && pacman -Syu --noconfirm cronie curl tar tzdata socat ca-certificates openssl
+            pacman -Syu && pacman -Syu --noconfirm cronie curl tar tzdata socat ca-certificates openssl procps-ng kmod
         ;;
         opensuse-tumbleweed | opensuse-leap)
-            zypper refresh && zypper -q install -y cron curl tar timezone socat ca-certificates openssl
+            zypper refresh && zypper -q install -y cron curl tar timezone socat ca-certificates openssl procps kmod
         ;;
         alpine)
-            apk update && apk add dcron curl tar tzdata socat ca-certificates openssl
+            apk update && apk add dcron curl tar tzdata socat ca-certificates openssl procps kmod
         ;;
         *)
             apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl
@@ -115,6 +115,67 @@ gen_random_string() {
     openssl rand -base64 $(( length * 2 )) \
         | tr -dc 'a-zA-Z0-9' \
         | head -c "$length"
+}
+
+enable_native_bbr_fq() {
+    echo -e "${green}Configuring JuLiang network acceleration: native BBR + FQ...${plain}"
+
+    if [[ "$(uname -s)" != "Linux" ]]; then
+        echo -e "${yellow}BBR skipped: non-Linux system.${plain}"
+        return 0
+    fi
+
+    if ! command -v sysctl >/dev/null 2>&1; then
+        echo -e "${yellow}BBR skipped: sysctl is not available.${plain}"
+        return 0
+    fi
+
+    # Try to load tcp_bbr when it is built as a module. Built-in kernels do not
+    # require this and may still report BBR as available.
+    if command -v modprobe >/dev/null 2>&1; then
+        if modprobe tcp_bbr >/dev/null 2>&1; then
+            mkdir -p /etc/modules-load.d
+            echo "tcp_bbr" > /etc/modules-load.d/99-juliang-bbr.conf
+        fi
+    fi
+
+    local available
+    available="$(sysctl -n net.ipv4.tcp_available_congestion_control 2>/dev/null || true)"
+    if ! echo "$available" | grep -qw "bbr"; then
+        echo -e "${yellow}Native BBR is not available in kernel $(uname -r). JuLiang will not replace the VPS kernel automatically.${plain}"
+        echo -e "${yellow}Current available congestion controls: ${available:-unknown}${plain}"
+        return 0
+    fi
+
+    mkdir -p /etc/sysctl.d
+    cat > /etc/sysctl.d/99-juliang-bbr.conf <<'EOF'
+# JuLiang-UI network acceleration
+# Stable default: upstream/native Linux BBR + FQ.
+net.core.default_qdisc=fq
+net.ipv4.tcp_congestion_control=bbr
+EOF
+
+    # Apply only JuLiang's file; do not re-apply every unrelated sysctl file.
+    if ! sysctl -p /etc/sysctl.d/99-juliang-bbr.conf >/dev/null 2>&1; then
+        # Some containers restrict one of these sysctls. Apply independently so
+        # a restricted qdisc setting does not hide a usable BBR setting.
+        sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1 || true
+        sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1 || true
+    fi
+
+    local cc qdisc
+    cc="$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || true)"
+    qdisc="$(sysctl -n net.core.default_qdisc 2>/dev/null || true)"
+
+    if [[ "$cc" == "bbr" && "$qdisc" == "fq" ]]; then
+        echo -e "${green}BBR + FQ enabled successfully. Kernel: $(uname -r), congestion: $cc, qdisc: $qdisc${plain}"
+    elif [[ "$cc" == "bbr" ]]; then
+        echo -e "${yellow}BBR is enabled, but default_qdisc is '$qdisc' instead of 'fq' (container/host restriction may apply).${plain}"
+    else
+        echo -e "${yellow}BBR could not be enabled on this kernel/container. Current congestion: ${cc:-unknown}, qdisc: ${qdisc:-unknown}.${plain}"
+    fi
+
+    return 0
 }
 
 install_acme() {
@@ -944,6 +1005,7 @@ install_x-ui() {
     fi
     
     echo -e "${green}JuLiang-UI Stable ${tag_version} installation finished; Xray ${JULIANG_XRAY_VERSION}.${plain}"
+    echo -e "${green}Network acceleration policy: native Linux BBR + FQ (enabled when supported by the current kernel).${plain}"
     echo -e ""
     echo -e "┌───────────────────────────────────────────────────────┐
 │  ${blue}x-ui control menu usages (subcommands):${plain}              │
@@ -967,4 +1029,5 @@ install_x-ui() {
 
 echo -e "${green}Running...${plain}"
 install_base
+enable_native_bbr_fq
 install_x-ui $1
