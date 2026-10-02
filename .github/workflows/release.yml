@@ -53,6 +53,9 @@ jobs:
           grep -q 'github.com/mhsanaei/3x-ui/v2' go.mod
           grep -q 'JULIANG_PANEL_VERSION="v2.9.3"' install.sh
           grep -q 'JULIANG_XRAY_VERSION="v26.4.25"' install.sh
+          grep -q 'JULIANG_RELEASE="juliang-v2.9.3-r2.6"' install.sh
+          bash -n install.sh
+          bash -n x-ui.sh
 
       - name: Setup Go
         uses: actions/setup-go@v6

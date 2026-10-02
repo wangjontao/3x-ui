@@ -826,7 +826,7 @@ config_after_install() {
         fi
     done
     
-    if [[ ${#existing_webBasePath} -lt 4 ]]; then
+    if [[ "$existing_hasDefaultCredential" == "true" || ${#existing_webBasePath} -lt 4 ]]; then
         if [[ "$existing_hasDefaultCredential" == "true" ]]; then
             local config_webBasePath=""
             local config_username=""
@@ -835,7 +835,13 @@ config_after_install() {
 
             read -rp "是否手动设置面板端口？不设置将随机生成 [y/n]: " config_confirm
             if [[ "${config_confirm}" == "y" || "${config_confirm}" == "Y" ]]; then
-                read -rp "请输入面板端口: " config_port
+                while true; do
+                    read -rp "请输入面板端口 [1024-65535]: " config_port
+                    if [[ "${config_port}" =~ ^[0-9]+$ ]] && (( config_port >= 1024 && config_port <= 65535 )); then
+                        break
+                    fi
+                    echo -e "${red}端口必须是 1024-65535 之间的数字，请重新输入。${plain}"
+                done
                 echo -e "${yellow}面板端口：${config_port}${plain}"
             else
                 local config_port=$(shuf -i 1024-62000 -n 1)
