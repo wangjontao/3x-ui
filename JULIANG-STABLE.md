@@ -58,3 +58,12 @@ Branch: `juliang-r2.6`
 Base: successful immutable `juliang-v2.9.3-r2.5`.
 
 R2.6 only changes the installation experience: fresh installs can manually choose username, password and WebBasePath (or press Enter for secure random values). R2.5 routing/proxy behavior remains unchanged.
+
+
+## R2.7 branch
+
+Branch: `juliang-r2.7`
+
+Base: immutable successful `juliang-v2.9.3-r2.6`.
+
+Adds a desktop inbound-table column named **实时速度**, showing per-inbound upload and download rates in B/s, KB/s or MB/s. It reuses the existing Xray traffic WebSocket delta stream and actual event timing, adding no extra traffic polling.

@@ -488,6 +488,12 @@
                         </a-tag>
                       </a-popover>
                     </template>
+                    <template slot="realtimeSpeed" slot-scope="text, dbInbound">
+                      <div :style="{ lineHeight: '20px', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }">
+                        <div>↑ [[ formatRealtimeSpeed(getRealtimeSpeed(dbInbound).up) ]]</div>
+                        <div>↓ [[ formatRealtimeSpeed(getRealtimeSpeed(dbInbound).down) ]]</div>
+                      </div>
+                    </template>
                     <template slot="allTimeInbound"
                       slot-scope="text, dbInbound">
                       <a-tag>[[ SizeFormatter.sizeFormat(dbInbound.allTime || 0)
@@ -1049,6 +1055,11 @@
     width: 90,
     scopedSlots: { customRender: 'traffic' },
   }, {
+    title: '实时速度',
+    align: 'center',
+    width: 105,
+    scopedSlots: { customRender: 'realtimeSpeed' },
+  }, {
     title: '{{ i18n "pages.inbounds.allTimeTraffic" }}',
     align: 'center',
     width: 60,
@@ -1123,6 +1134,8 @@
       clientCount: [],
       onlineClients: [],
       lastOnlineMap: {},
+      realtimeSpeedByTag: {},
+      lastTrafficSampleAt: 0,
       isRefreshEnabled: localStorage.getItem("isRefreshEnabled") === "true" ? true : false,
       refreshing: false,
       refreshInterval: Number(localStorage.getItem("refreshInterval")) || 5000,
@@ -1144,6 +1157,54 @@
     methods: {
       loading(spinning = true) {
         this.loadingStates.spinning = spinning;
+      },
+      getRealtimeSpeed(dbInbound) {
+        if (!dbInbound || !dbInbound.tag) return { up: 0, down: 0 };
+        return this.realtimeSpeedByTag[dbInbound.tag] || { up: 0, down: 0 };
+      },
+      formatRealtimeSpeed(bytesPerSecond) {
+        const value = Number(bytesPerSecond) || 0;
+        return SizeFormatter.sizeFormat(Math.max(0, value)) + '/s';
+      },
+      updateRealtimeSpeeds(payload) {
+        const now = Date.now();
+        const previous = this.lastTrafficSampleAt;
+        this.lastTrafficSampleAt = now;
+
+        // The Xray stats API is queried with Reset=true, so every traffic
+        // payload is a byte delta for one sampling interval. The first event
+        // establishes our local timestamp; the next event starts accurate B/s.
+        if (!previous) {
+          const zero = {};
+          this.dbInbounds.forEach(dbInbound => {
+            if (dbInbound && dbInbound.tag) zero[dbInbound.tag] = { up: 0, down: 0 };
+          });
+          this.realtimeSpeedByTag = zero;
+          return;
+        }
+
+        const elapsedSeconds = Math.max((now - previous) / 1000, 0.25);
+        const next = {};
+        this.dbInbounds.forEach(dbInbound => {
+          if (dbInbound && dbInbound.tag) next[dbInbound.tag] = { up: 0, down: 0 };
+        });
+
+        const traffics = payload && Array.isArray(payload.traffics) ? payload.traffics : [];
+        traffics.forEach(item => {
+          if (!item) return;
+          const isInbound = item.IsInbound ?? item.isInbound ?? false;
+          if (!isInbound) return;
+          const tag = item.Tag ?? item.tag;
+          if (!tag) return;
+          const up = Number(item.Up ?? item.up ?? 0);
+          const down = Number(item.Down ?? item.down ?? 0);
+          next[tag] = {
+            up: Math.max(0, up / elapsedSeconds),
+            down: Math.max(0, down / elapsedSeconds),
+          };
+        });
+
+        this.realtimeSpeedByTag = next;
       },
       async getOutboundTags() {
         try {
@@ -2195,6 +2256,8 @@
 
         // Listen for traffic updates
         window.wsClient.on('traffic', (payload) => {
+          this.updateRealtimeSpeeds(payload);
+
           // Note: Do NOT update total consumed traffic (stats.up, stats.down) from this event
           // because clientTraffics contains delta/incremental values, not total accumulated values.
           // Total traffic is updated via the 'inbounds' WebSocket event (or 'invalidate' fallback for large panels).

@@ -11,10 +11,10 @@ cur_dir=$(pwd)
 xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
 JULIANG_REPO="wangjontao/3x-ui"
-JULIANG_BRANCH="juliang-r2.6"
+JULIANG_BRANCH="juliang-r2.7"
 JULIANG_PANEL_VERSION="v2.9.3"
 JULIANG_XRAY_VERSION="v26.4.25"
-JULIANG_RELEASE="juliang-v2.9.3-r2.6"
+JULIANG_RELEASE="juliang-v2.9.3-r2.7"
 JULIANG_RELEASE_BASE="https://github.com/${JULIANG_REPO}/releases/download/${JULIANG_RELEASE}"
 JULIANG_RAW_BASE="https://raw.githubusercontent.com/${JULIANG_REPO}/${JULIANG_RELEASE}"
 

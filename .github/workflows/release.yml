@@ -1,10 +1,10 @@
-name: JuLiang Stable R2.6
+name: JuLiang Stable R2.7
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - juliang-r2.6
+      - juliang-r2.7
     paths:
       - "**.go"
       - "go.mod"
@@ -23,13 +23,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: juliang-r2.6
+  group: juliang-r2.7
   cancel-in-progress: true
 
 env:
   JULIANG_PANEL_VERSION: v2.9.3
   JULIANG_XRAY_VERSION: v26.4.25
-  JULIANG_RELEASE_TAG: juliang-v2.9.3-r2.6
+  JULIANG_RELEASE_TAG: juliang-v2.9.3-r2.7
 
 jobs:
   build:
@@ -44,7 +44,7 @@ jobs:
       - name: Checkout locked source
         uses: actions/checkout@v6
         with:
-          ref: juliang-r2.6
+          ref: juliang-r2.7
 
       - name: Verify locked source
         shell: bash
@@ -53,7 +53,9 @@ jobs:
           grep -q 'github.com/mhsanaei/3x-ui/v2' go.mod
           grep -q 'JULIANG_PANEL_VERSION="v2.9.3"' install.sh
           grep -q 'JULIANG_XRAY_VERSION="v26.4.25"' install.sh
-          grep -q 'JULIANG_RELEASE="juliang-v2.9.3-r2.6"' install.sh
+          grep -q 'JULIANG_RELEASE="juliang-v2.9.3-r2.7"' install.sh
+          grep -q "title: '实时速度'" web/html/inbounds.html
+          grep -q "updateRealtimeSpeeds(payload)" web/html/inbounds.html
           bash -n install.sh
           bash -n x-ui.sh
 
@@ -136,7 +138,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: juliang-r2.6
+          ref: juliang-r2.7
           fetch-depth: 0
 
       - name: Download artifacts
@@ -157,4 +159,4 @@ jobs:
           fi
           git tag "${JULIANG_RELEASE_TAG}" "$GITHUB_SHA"
           git push origin "refs/tags/${JULIANG_RELEASE_TAG}"
-          gh release create "${JULIANG_RELEASE_TAG}"             --target "$GITHUB_SHA"             --title "JuLiang-UI Stable R2.6 · v2.9.3 / Xray v26.4.25"             --notes "JuLiang stable R2.6. Based exactly on successful R2.5. Adds interactive installation prompts for custom panel username, password, WebBasePath, and optional panel port while preserving all R2.5 SK5 routing, Reality presets, Chinese management UI, duplicate-email handling, BBR + FQ, and locked Xray v26.4.25."             release-artifacts/*.tar.gz release-artifacts/*.sha256
+          gh release create "${JULIANG_RELEASE_TAG}"             --target "$GITHUB_SHA"             --title "JuLiang-UI Stable R2.7 · v2.9.3 / Xray v26.4.25"             --notes "JuLiang stable R2.7. Based on successful R2.6. Adds per-inbound real-time upload/download speed in the inbound table using the existing Xray traffic WebSocket deltas, without extra polling. Preserves R2.6 interactive installer and all R2.5 routing/proxy behavior."             release-artifacts/*.tar.gz release-artifacts/*.sha256
