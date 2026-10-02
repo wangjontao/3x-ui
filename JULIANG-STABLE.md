@@ -49,3 +49,12 @@ When adding a client, manually-entered duplicate emails are automatically suffix
 Release tag: `juliang-v2.9.3-r2.5`.
 
 Per-client landing routes are always injected at the very beginning of `routing.rules`, so a selected SK5/outbound takes priority over generic/direct rules already present in the Xray template.
+
+
+## R2.6 branch
+
+Branch: `juliang-r2.6`
+
+Base: successful immutable `juliang-v2.9.3-r2.5`.
+
+R2.6 only changes the installation experience: fresh installs can manually choose username, password and WebBasePath (or press Enter for secure random values). R2.5 routing/proxy behavior remains unchanged.

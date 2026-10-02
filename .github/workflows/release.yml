@@ -1,10 +1,10 @@
-name: JuLiang Stable v2.9.3
+name: JuLiang Stable R2.6
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - juliang-stable-v2.9.3
+      - juliang-r2.6
     paths:
       - "**.go"
       - "go.mod"
@@ -23,13 +23,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: juliang-stable-v2.9.3
+  group: juliang-r2.6
   cancel-in-progress: true
 
 env:
   JULIANG_PANEL_VERSION: v2.9.3
   JULIANG_XRAY_VERSION: v26.4.25
-  JULIANG_RELEASE_TAG: juliang-v2.9.3-r2.5
+  JULIANG_RELEASE_TAG: juliang-v2.9.3-r2.6
 
 jobs:
   build:
@@ -44,7 +44,7 @@ jobs:
       - name: Checkout locked source
         uses: actions/checkout@v6
         with:
-          ref: juliang-stable-v2.9.3
+          ref: juliang-r2.6
 
       - name: Verify locked source
         shell: bash
@@ -133,7 +133,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: juliang-stable-v2.9.3
+          ref: juliang-r2.6
           fetch-depth: 0
 
       - name: Download artifacts
@@ -154,4 +154,4 @@ jobs:
           fi
           git tag "${JULIANG_RELEASE_TAG}" "$GITHUB_SHA"
           git push origin "refs/tags/${JULIANG_RELEASE_TAG}"
-          gh release create "${JULIANG_RELEASE_TAG}"             --target "$GITHUB_SHA"             --title "JuLiang-UI Stable R2.5 · v2.9.3 / Xray v26.4.25"             --notes "JuLiang stable R2.5. Locked to 3x-ui v2.9.3 and Xray-core v26.4.25. Forces all per-client landing user routes to the very front of Xray routing.rules so selected SK5/outbound wins over generic/direct rules. Keeps duplicate-email auto-fix, complete Chinese management script, immutable-tag raw downloads, SK5 import, one-click presets, and BBR + FQ."             release-artifacts/*.tar.gz release-artifacts/*.sha256
+          gh release create "${JULIANG_RELEASE_TAG}"             --target "$GITHUB_SHA"             --title "JuLiang-UI Stable R2.6 · v2.9.3 / Xray v26.4.25"             --notes "JuLiang stable R2.6. Based exactly on successful R2.5. Adds interactive installation prompts for custom panel username, password, WebBasePath, and optional panel port while preserving all R2.5 SK5 routing, Reality presets, Chinese management UI, duplicate-email handling, BBR + FQ, and locked Xray v26.4.25."             release-artifacts/*.tar.gz release-artifacts/*.sha256

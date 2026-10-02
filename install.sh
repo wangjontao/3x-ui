@@ -11,10 +11,10 @@ cur_dir=$(pwd)
 xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
 JULIANG_REPO="wangjontao/3x-ui"
-JULIANG_BRANCH="juliang-stable-v2.9.3"
+JULIANG_BRANCH="juliang-r2.6"
 JULIANG_PANEL_VERSION="v2.9.3"
 JULIANG_XRAY_VERSION="v26.4.25"
-JULIANG_RELEASE="juliang-v2.9.3-r2.5"
+JULIANG_RELEASE="juliang-v2.9.3-r2.6"
 JULIANG_RELEASE_BASE="https://github.com/${JULIANG_REPO}/releases/download/${JULIANG_RELEASE}"
 JULIANG_RAW_BASE="https://raw.githubusercontent.com/${JULIANG_REPO}/${JULIANG_RELEASE}"
 
@@ -728,6 +728,79 @@ prompt_and_setup_ssl() {
     esac
 }
 
+prompt_juliang_panel_identity() {
+    local input=""
+    local confirm_password=""
+
+    echo ""
+    echo -e "${green}═══════════════════════════════════════════${plain}"
+    echo -e "${green}       JuLiang 面板登录信息设置             ${plain}"
+    echo -e "${green}═══════════════════════════════════════════${plain}"
+    echo -e "${yellow}直接回车可自动随机生成；手动输入则使用你指定的值。${plain}"
+    echo ""
+
+    while true; do
+        read -rp "请输入面板用户名（回车随机生成）: " input
+        input="${input// /}"
+        if [[ -z "${input}" ]]; then
+            config_username=$(gen_random_string 10)
+            echo -e "${yellow}已随机生成用户名：${config_username}${plain}"
+            break
+        fi
+        if [[ "${input}" =~ ^[A-Za-z0-9._-]{3,64}$ ]]; then
+            config_username="${input}"
+            break
+        fi
+        echo -e "${red}用户名仅允许字母、数字、点、下划线、短横线，长度 3-64。${plain}"
+    done
+
+    while true; do
+        read -rsp "请输入面板密码（回车随机生成）: " input
+        echo ""
+        if [[ -z "${input}" ]]; then
+            config_password=$(gen_random_string 16)
+            echo -e "${yellow}已随机生成密码。${plain}"
+            break
+        fi
+        if [[ ${#input} -lt 6 || ${#input} -gt 128 ]]; then
+            echo -e "${red}密码长度需要 6-128 个字符。${plain}"
+            continue
+        fi
+        read -rsp "请再次输入密码确认: " confirm_password
+        echo ""
+        if [[ "${input}" != "${confirm_password}" ]]; then
+            echo -e "${red}两次输入的密码不一致，请重新输入。${plain}"
+            continue
+        fi
+        config_password="${input}"
+        break
+    done
+
+    while true; do
+        read -rp "请输入 WebBasePath（例如 juliang；回车随机生成）: " input
+        input="${input// /}"
+        input="${input#/}"
+        input="${input%/}"
+        if [[ -z "${input}" ]]; then
+            config_webBasePath=$(gen_random_string 18)
+            echo -e "${yellow}已随机生成 WebBasePath：${config_webBasePath}${plain}"
+            break
+        fi
+        if [[ "${input}" =~ ^[A-Za-z0-9_-]{4,64}$ ]]; then
+            config_webBasePath="${input}"
+            break
+        fi
+        echo -e "${red}WebBasePath 仅允许字母、数字、下划线、短横线，长度 4-64；不需要输入前后斜杠。${plain}"
+    done
+
+    echo ""
+    echo -e "${green}登录信息已确认：${plain}"
+    echo -e "${green}Username:    ${config_username}${plain}"
+    echo -e "${green}WebBasePath: /${config_webBasePath}/${plain}"
+    echo -e "${yellow}密码将在安装完成摘要中再次显示，请妥善保存。${plain}"
+    echo ""
+}
+
 config_after_install() {
     local existing_hasDefaultCredential=$(${xui_folder}/x-ui setting -show true | grep -Eo 'hasDefaultCredential: .+' | awk '{print $2}')
     local existing_webBasePath=$(${xui_folder}/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}' | sed 's#^/##')
@@ -755,17 +828,18 @@ config_after_install() {
     
     if [[ ${#existing_webBasePath} -lt 4 ]]; then
         if [[ "$existing_hasDefaultCredential" == "true" ]]; then
-            local config_webBasePath=$(gen_random_string 18)
-            local config_username=$(gen_random_string 10)
-            local config_password=$(gen_random_string 10)
-            
-            read -rp "Would you like to customize the Panel Port settings? (If not, a random port will be applied) [y/n]: " config_confirm
+            local config_webBasePath=""
+            local config_username=""
+            local config_password=""
+            prompt_juliang_panel_identity
+
+            read -rp "是否手动设置面板端口？不设置将随机生成 [y/n]: " config_confirm
             if [[ "${config_confirm}" == "y" || "${config_confirm}" == "Y" ]]; then
-                read -rp "Please set up the panel port: " config_port
-                echo -e "${yellow}Your Panel Port is: ${config_port}${plain}"
+                read -rp "请输入面板端口: " config_port
+                echo -e "${yellow}面板端口：${config_port}${plain}"
             else
                 local config_port=$(shuf -i 1024-62000 -n 1)
-                echo -e "${yellow}Generated random port: ${config_port}${plain}"
+                echo -e "${yellow}已随机生成面板端口：${config_port}${plain}"
             fi
             
             ${xui_folder}/x-ui setting -username "${config_username}" -password "${config_password}" -port "${config_port}" -webBasePath "${config_webBasePath}"
@@ -816,12 +890,39 @@ config_after_install() {
         fi
     else
         if [[ "$existing_hasDefaultCredential" == "true" ]]; then
-            local config_username=$(gen_random_string 10)
-            local config_password=$(gen_random_string 10)
-            
-            echo -e "${yellow}Default credentials detected. Security update required...${plain}"
+            local config_username=""
+            local config_password=""
+            local config_webBasePath="${existing_webBasePath}"
+            echo -e "${yellow}检测到默认登录信息，请重新设置。${plain}"
+
+            while true; do
+                read -rp "请输入面板用户名（回车随机生成）: " config_username
+                config_username="${config_username// /}"
+                if [[ -z "${config_username}" ]]; then
+                    config_username=$(gen_random_string 10)
+                    break
+                fi
+                [[ "${config_username}" =~ ^[A-Za-z0-9._-]{3,64}$ ]] && break
+                echo -e "${red}用户名格式无效，请重新输入。${plain}"
+            done
+
+            while true; do
+                read -rsp "请输入面板密码（回车随机生成）: " config_password
+                echo ""
+                if [[ -z "${config_password}" ]]; then
+                    config_password=$(gen_random_string 16)
+                    break
+                fi
+                if [[ ${#config_password} -ge 6 && ${#config_password} -le 128 ]]; then
+                    local verify_password=""
+                    read -rsp "请再次输入密码确认: " verify_password
+                    echo ""
+                    [[ "${config_password}" == "${verify_password}" ]] && break
+                fi
+                echo -e "${red}密码无效或两次输入不一致，请重新输入。${plain}"
+            done
+
             ${xui_folder}/x-ui setting -username "${config_username}" -password "${config_password}"
-            echo -e "Generated new random login credentials:"
             echo -e "###############################################"
             echo -e "${green}Username: ${config_username}${plain}"
             echo -e "${green}Password: ${config_password}${plain}"
